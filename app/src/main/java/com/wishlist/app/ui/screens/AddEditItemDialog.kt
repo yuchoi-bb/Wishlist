@@ -209,6 +209,9 @@ fun AddEditItemDialog(
                                     minorCategory = minorCategory.trim().ifBlank { null },
                                     startedAt = startedAt,
                                     completedAt = completedAt,
+                                    // A reorder rewrites ranks as 0,1,2…, so a timestamp puts new
+                                    // items after anything already arranged by hand.
+                                    position = editingItem?.position ?: System.currentTimeMillis(),
                                 ),
                             )
                         },

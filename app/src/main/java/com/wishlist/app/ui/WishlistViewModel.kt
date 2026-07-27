@@ -12,6 +12,7 @@ import com.wishlist.app.data.WishlistDatabase
 import com.wishlist.app.data.WishlistItem
 import com.wishlist.app.repository.WishlistRepository
 import com.wishlist.app.repository.WishlistUiState
+import com.wishlist.app.util.todayStartOfDayMillis
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -87,12 +88,32 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
     fun toggleCompleted(item: WishlistItem) {
         val uid = authManager.currentUser.value?.uid ?: return
         viewModelScope.launch {
-            repository.setCompleted(uid, item, if (item.isCompleted) null else System.currentTimeMillis())
+            repository.setCompleted(uid, item, if (item.isCompleted) null else todayStartOfDayMillis())
         }
     }
 
     fun setCompletedAt(item: WishlistItem, completedAt: Long?) {
         val uid = authManager.currentUser.value?.uid ?: return
         viewModelScope.launch { repository.setCompleted(uid, item, completedAt) }
+    }
+
+    fun toggleSubItem(item: WishlistItem, index: Int) {
+        val uid = authManager.currentUser.value?.uid ?: return
+        val subItem = item.subItems.getOrNull(index) ?: return
+        val updated = item.subItems.toMutableList().apply { this[index] = subItem.copy(done = !subItem.done) }
+        viewModelScope.launch { repository.updateSubItems(uid, item, updated) }
+    }
+
+    fun moveSubItem(item: WishlistItem, from: Int, to: Int) {
+        val uid = authManager.currentUser.value?.uid ?: return
+        if (from !in item.subItems.indices || to !in item.subItems.indices) return
+        val updated = item.subItems.toMutableList().apply { add(to, removeAt(from)) }
+        viewModelScope.launch { repository.updateSubItems(uid, item, updated) }
+    }
+
+    /** Commits a finished drag: stores the new ranks and pins that group to 직접 지정 order. */
+    fun applyManualOrder(categoryKey: String, orderedIds: List<String>) {
+        val uid = authManager.currentUser.value?.uid ?: return
+        viewModelScope.launch { repository.applyManualOrder(uid, categoryKey, orderedIds) }
     }
 }

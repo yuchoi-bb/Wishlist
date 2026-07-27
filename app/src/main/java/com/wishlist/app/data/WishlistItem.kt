@@ -20,6 +20,12 @@ data class WishlistItem(
     val startedAt: Long = 0,
     /** "완료일" — date only, null means still in progress. */
     val completedAt: Long? = null,
+    /**
+     * Rank within its category group under SortField.MANUAL. A reorder rewrites these as 0,1,2…,
+     * while newly created items get a millisecond timestamp so they land after anything already
+     * arranged by hand.
+     */
+    val position: Long = 0,
 ) {
     val isCompleted: Boolean get() = completedAt != null
 

@@ -5,6 +5,7 @@ import com.wishlist.app.data.CategorySortPrefDao
 import com.wishlist.app.data.FirestoreWishlistRepository
 import com.wishlist.app.data.SortField
 import com.wishlist.app.data.StatusFilter
+import com.wishlist.app.data.SubItem
 import com.wishlist.app.data.WishlistItem
 import java.text.Collator
 import java.util.Locale
@@ -40,6 +41,19 @@ class WishlistRepository(
 
     suspend fun setSortForCategory(categoryKey: String, field: SortField, ascending: Boolean) {
         sortPrefDao.upsert(CategorySortPref(categoryKey, field, ascending))
+    }
+
+    /**
+     * Persists a hand-arranged order and pins the group to it — leaving the group on a computed
+     * sort would just re-sort the items and throw the drag away on the next emission.
+     */
+    suspend fun applyManualOrder(uid: String, categoryKey: String, orderedIds: List<String>) {
+        firestoreRepository?.updatePositions(uid, orderedIds)
+        sortPrefDao.upsert(CategorySortPref(categoryKey, SortField.MANUAL, ascending = true))
+    }
+
+    suspend fun updateSubItems(uid: String, item: WishlistItem, subItems: List<SubItem>) {
+        firestoreRepository?.saveItem(uid, item.copy(subItems = subItems))
     }
 
     private fun itemsFlow(uid: String): Flow<List<WishlistItem>> =
@@ -102,6 +116,10 @@ class WishlistRepository(
         ascending: Boolean,
         now: Long,
     ): List<WishlistItem> {
+        // Manual order is exactly what the user dragged: no direction flip, and no sinking of
+        // in-progress items, since either would move rows away from where they were dropped.
+        if (field == SortField.MANUAL) return items.sortedBy { it.position }
+
         val fieldComparator = fieldComparator(field, now)
         val directional = if (ascending) fieldComparator else fieldComparator.reversed()
         val (completed, inProgress) = items.partition { it.isCompleted }
@@ -117,5 +135,6 @@ class WishlistRepository(
                 val collator = Collator.getInstance(Locale.KOREAN)
                 Comparator { a, b -> collator.compare(a.title, b.title) }
             }
+            SortField.MANUAL -> Comparator.comparingLong { it.position }
         }
 }

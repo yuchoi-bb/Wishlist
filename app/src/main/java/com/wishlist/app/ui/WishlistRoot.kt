@@ -41,6 +41,9 @@ fun WishlistRoot(viewModel: WishlistViewModel = viewModel()) {
             viewModel.onSortChange(group.categoryKey, group.sortField, group.sortField, group.ascending)
         },
         onToggleCompleted = viewModel::toggleCompleted,
+        onToggleSubItem = viewModel::toggleSubItem,
+        onMoveSubItem = viewModel::moveSubItem,
+        onReorder = viewModel::applyManualOrder,
         onItemClick = { item ->
             editingItem = item
             showAddEdit = true

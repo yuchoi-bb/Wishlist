@@ -44,6 +44,21 @@ class FirestoreWishlistRepository(private val firestore: FirebaseFirestore) {
         itemsCollection(uid).document(item.id).delete().await()
     }
 
+    /**
+     * Writes the new manual ranks for one reordered group as a single batch — a drag produces many
+     * intermediate swaps, so committing once at the end keeps it to one round trip.
+     */
+    suspend fun updatePositions(uid: String, orderedIds: List<String>) {
+        val collection = itemsCollection(uid)
+        val batch = firestore.batch()
+        orderedIds.forEachIndexed { index, id ->
+            if (id.isNotBlank()) {
+                batch.update(collection.document(id), "position", index.toLong())
+            }
+        }
+        batch.commit().await()
+    }
+
     suspend fun getAllItemsOnce(uid: String): List<WishlistItem> =
         itemsCollection(uid).get().await().documents.map { it.toWishlistItem() }
 }
@@ -57,6 +72,7 @@ private fun DocumentSnapshot.toWishlistItem(): WishlistItem = WishlistItem(
     minorCategory = getString("minorCategory"),
     startedAt = getLong("startedAt") ?: 0L,
     completedAt = getLong("completedAt"),
+    position = getLong("position") ?: 0L,
 )
 
 @Suppress("UNCHECKED_CAST")
@@ -80,4 +96,5 @@ private fun WishlistItem.toFirestoreMap(): Map<String, Any?> = mapOf(
     // restored from an older backup) get cleaned up the next time they're saved.
     "startedAt" to startedAt.toStartOfDayMillis(),
     "completedAt" to completedAt?.toStartOfDayMillis(),
+    "position" to position,
 )

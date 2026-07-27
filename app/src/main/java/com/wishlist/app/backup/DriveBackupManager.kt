@@ -128,6 +128,7 @@ private fun WishlistItem.toJson(): JSONObject = JSONObject().apply {
     put("minorCategory", minorCategory)
     put("startedAt", startedAt)
     put("completedAt", completedAt)
+    put("position", position)
 }
 
 private fun JSONObject.toWishlistItem(): WishlistItem = WishlistItem(
@@ -144,6 +145,7 @@ private fun JSONObject.toWishlistItem(): WishlistItem = WishlistItem(
     minorCategory = if (isNull("minorCategory")) null else optString("minorCategory"),
     startedAt = getLong("startedAt"),
     completedAt = if (isNull("completedAt") || !has("completedAt")) null else optLong("completedAt"),
+    position = optLong("position", 0L),
 )
 
 private fun CategorySortPref.toJson(): JSONObject = JSONObject().apply {

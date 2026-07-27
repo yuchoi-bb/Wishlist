@@ -28,6 +28,7 @@ fun sortFieldLabel(field: SortField): String = when (field) {
     SortField.STARTED_AT -> "시작일"
     SortField.DURATION -> "고민한 기간"
     SortField.TITLE -> "할 일 이름"
+    SortField.MANUAL -> "직접 지정"
 }
 
 /**
@@ -73,11 +74,14 @@ fun CategoryGroupHeader(
             }
         }
 
-        IconButton(onClick = onToggleDirection) {
-            Icon(
-                imageVector = if (ascending) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
-                contentDescription = if (ascending) "오름차순" else "내림차순",
-            )
+        // A direction toggle is meaningless for a hand-arranged order.
+        if (sortField != SortField.MANUAL) {
+            IconButton(onClick = onToggleDirection) {
+                Icon(
+                    imageVector = if (ascending) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
+                    contentDescription = if (ascending) "오름차순" else "내림차순",
+                )
+            }
         }
     }
 }
