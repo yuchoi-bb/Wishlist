@@ -26,6 +26,9 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Diagnose grpc dependency versions
+        run: ./gradlew :app:dependencies --configuration debugRuntimeClasspath | grep -i -B2 -A1 grpc || true
+
       - name: Assemble debug APK
         run: ./gradlew assembleDebug --stacktrace
 
