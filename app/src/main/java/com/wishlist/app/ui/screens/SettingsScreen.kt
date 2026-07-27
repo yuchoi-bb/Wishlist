@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -72,7 +75,13 @@ fun SettingsScreen(authManager: AuthManager, onBack: () -> Unit) {
         },
     ) { padding ->
         Column(
-            modifier = Modifier.padding(padding).fillMaxSize().padding(20.dp),
+            // Scrollable: backup/update failures print the server's full response, which runs well
+            // past one screen and was previously cut off with no way to read the rest.
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text("계정", style = MaterialTheme.typography.titleMedium)
@@ -106,7 +115,11 @@ fun SettingsScreen(authManager: AuthManager, onBack: () -> Unit) {
                 Button(onClick = {
                     scope.launch {
                         val result = backupManager.backup(account, uid)
-                        statusMessage = if (result.isSuccess) "백업이 완료되었습니다" else "백업 실패: ${result.exceptionOrNull()?.message}"
+                        statusMessage = if (result.isSuccess) {
+                            "백업이 완료되었습니다"
+                        } else {
+                            describeDriveFailure("백업", result.exceptionOrNull())
+                        }
                     }
                 }) {
                     Text("지금 백업하기")
@@ -114,7 +127,11 @@ fun SettingsScreen(authManager: AuthManager, onBack: () -> Unit) {
                 OutlinedButton(onClick = {
                     scope.launch {
                         val result = backupManager.restore(account, uid)
-                        statusMessage = if (result.isSuccess) "복원이 완료되었습니다" else "복원 실패: ${result.exceptionOrNull()?.message}"
+                        statusMessage = if (result.isSuccess) {
+                            "복원이 완료되었습니다"
+                        } else {
+                            describeDriveFailure("복원", result.exceptionOrNull())
+                        }
                     }
                 }) {
                     Text("백업에서 복원하기")
@@ -137,7 +154,33 @@ fun SettingsScreen(authManager: AuthManager, onBack: () -> Unit) {
                 Text("업데이트 확인")
             }
 
-            statusMessage?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+            // Selectable so a failure can be copied out; the raw Google API error is long and the
+            // useful part is buried in it.
+            statusMessage?.let {
+                SelectionContainer {
+                    Text(it, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
         }
     }
+}
+
+/**
+ * Drive's own error text is a wall of JSON. Lead with the actionable cause where we can recognise
+ * it — a 403 here is almost always the Drive API simply not being enabled for the Cloud project,
+ * which no amount of retrying or re-consenting fixes — and keep the raw response underneath.
+ */
+private fun describeDriveFailure(action: String, error: Throwable?): String {
+    val raw = error?.message.orEmpty()
+    val hint = when {
+        raw.contains("SERVICE_DISABLED") || raw.contains("accessNotConfigured") ->
+            "이 프로젝트에서 Google Drive API가 켜져 있지 않습니다. " +
+                "console.cloud.google.com/apis/library/drive.googleapis.com 에서 사용 설정해주세요."
+        raw.contains("403") ->
+            "권한이 거부되었습니다. Google Cloud 콘솔에서 Drive API가 사용 설정되어 있는지, " +
+                "로그인 시 Drive 접근을 허용했는지 확인해주세요."
+        raw.contains("401") -> "인증이 만료되었습니다. 로그아웃 후 다시 로그인해주세요."
+        else -> null
+    }
+    return listOfNotNull("$action 실패", hint, raw).joinToString("\n\n")
 }
