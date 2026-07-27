@@ -7,8 +7,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.core.content.PermissionChecker
+import com.wishlist.app.CrashLog
+import com.wishlist.app.ui.screens.CrashScreen
 import com.wishlist.app.ui.theme.WishlistTheme
 import com.wishlist.app.update.UpdateChecker
 
@@ -30,14 +37,25 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             WishlistTheme {
-                WishlistRoot()
+                val context = LocalContext.current
+                var crashTrace by remember { mutableStateOf(CrashLog.readAndClear(context)) }
+
+                if (crashTrace != null) {
+                    // Shown instead of the normal screen so a crash-on-launch bug still surfaces
+                    // this, rather than looping straight back into whatever just crashed.
+                    CrashScreen(trace = crashTrace!!, onDismiss = { crashTrace = null })
+                } else {
+                    WishlistRoot()
+                }
             }
 
             LaunchedEffect(Unit) {
-                val checker = UpdateChecker(applicationContext)
-                val update = checker.checkForUpdate()
-                if (update != null) {
-                    checker.downloadUpdate(update)
+                runCatching {
+                    val checker = UpdateChecker(applicationContext)
+                    val update = checker.checkForUpdate()
+                    if (update != null) {
+                        checker.downloadUpdate(update)
+                    }
                 }
             }
         }
