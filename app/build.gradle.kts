@@ -11,6 +11,11 @@ if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
 }
 
+// Every CI build gets a higher version than the last, so the installed app can tell that the
+// latest GitHub release is newer and the in-app updater has something to offer. Local builds fall
+// back to 1 (Android rejects versionCode 0).
+val buildNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
+
 android {
     namespace = "com.wishlist.app"
     compileSdk = 34
@@ -19,8 +24,9 @@ android {
         applicationId = "com.wishlist.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = buildNumber
+        // Matches the v1.0.N release tag so UpdateChecker's semver comparison lines up.
+        versionName = "1.0.$buildNumber"
 
         // Owner/repo of the GitHub Releases feed used by the in-app update checker.
         buildConfigField("String", "UPDATE_REPO_OWNER", "\"yuchoi-bb\"")

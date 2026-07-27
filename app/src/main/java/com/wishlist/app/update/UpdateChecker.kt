@@ -45,7 +45,16 @@ class UpdateChecker(private val context: Context) {
         }.getOrNull()
     }
 
+    /**
+     * True once [downloadUpdate] has been called for this version. The update check runs on every
+     * launch and keeps reporting the same release until the user actually installs it, so without
+     * this the same APK would be re-downloaded (and re-notified) every single time.
+     */
+    fun alreadyDownloaded(version: String): Boolean =
+        prefs().getString(KEY_DOWNLOADED_VERSION, null) == version
+
     fun downloadUpdate(update: UpdateInfo) {
+        prefs().edit().putString(KEY_DOWNLOADED_VERSION, update.version).apply()
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val request = DownloadManager.Request(Uri.parse(update.apkUrl))
             .setTitle("Wishlist ${update.version} 업데이트")
@@ -80,5 +89,12 @@ class UpdateChecker(private val context: Context) {
             if (r != l) return r > l
         }
         return false
+    }
+
+    private fun prefs() = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    private companion object {
+        const val PREFS_NAME = "update_checker"
+        const val KEY_DOWNLOADED_VERSION = "downloaded_version"
     }
 }

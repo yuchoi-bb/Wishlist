@@ -53,7 +53,7 @@ class MainActivity : ComponentActivity() {
                 runCatching {
                     val checker = UpdateChecker(applicationContext)
                     val update = checker.checkForUpdate()
-                    if (update != null) {
+                    if (update != null && !checker.alreadyDownloaded(update.version)) {
                         checker.downloadUpdate(update)
                     }
                 }
