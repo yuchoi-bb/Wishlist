@@ -1,0 +1,65 @@
+package com.wishlist.app.ui
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.wishlist.app.data.WishlistItem
+import com.wishlist.app.ui.screens.AddEditItemDialog
+import com.wishlist.app.ui.screens.SettingsScreen
+import com.wishlist.app.ui.screens.WishlistListScreen
+
+@Composable
+fun WishlistRoot(viewModel: WishlistViewModel = viewModel()) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showSettings by remember { mutableStateOf(false) }
+    var showAddEdit by remember { mutableStateOf(false) }
+    var editingItem by remember { mutableStateOf<WishlistItem?>(null) }
+
+    if (showSettings) {
+        SettingsScreen(onBack = { showSettings = false })
+        return
+    }
+
+    WishlistListScreen(
+        uiState = uiState,
+        onSearchQueryChange = viewModel::onSearchQueryChange,
+        onStatusFilterChange = viewModel::onStatusFilterChange,
+        onSortFieldSelected = { group, field ->
+            viewModel.onSortChange(group.categoryKey, field, group.sortField, group.ascending)
+        },
+        onToggleDirection = { group ->
+            viewModel.onSortChange(group.categoryKey, group.sortField, group.sortField, group.ascending)
+        },
+        onToggleCompleted = viewModel::toggleCompleted,
+        onItemClick = { item ->
+            editingItem = item
+            showAddEdit = true
+        },
+        onAddClick = {
+            editingItem = null
+            showAddEdit = true
+        },
+        onSettingsClick = { showSettings = true },
+    )
+
+    if (showAddEdit) {
+        AddEditItemDialog(
+            viewModel = viewModel,
+            majorCategorySuggestions = uiState.majorCategories,
+            editingItem = editingItem,
+            onDismiss = { showAddEdit = false },
+            onSave = { item ->
+                viewModel.saveItem(item)
+                showAddEdit = false
+            },
+            onDelete = { item ->
+                viewModel.deleteItem(item)
+                showAddEdit = false
+            },
+        )
+    }
+}

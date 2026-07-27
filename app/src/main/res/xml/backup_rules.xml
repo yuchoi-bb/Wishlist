@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pre-Android 12 (API < 31) OS-level auto backup: include the Room database so a device
+     restore brings wishlist items back with no user setup. -->
+<full-backup-content>
+    <include domain="database" path="wishlist.db" />
+    <include domain="database" path="wishlist.db-wal" />
+    <include domain="database" path="wishlist.db-shm" />
+</full-backup-content>
