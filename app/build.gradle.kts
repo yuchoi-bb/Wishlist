@@ -5,6 +5,12 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+// Applied only once app/google-services.json exists (downloaded from the Firebase console),
+// so CI keeps building green before that file is added to the project.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.wishlist.app"
     compileSdk = 34
@@ -75,6 +81,12 @@ dependencies {
     ksp("androidx.room:room-compiler:2.6.1")
 
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // Firestore (real-time multi-device sync) + Firebase Auth (scopes each user to their own data).
+    implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
+    implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 
     // Google sign-in + Drive REST API (appDataFolder manual backup/restore).
     implementation("com.google.android.gms:play-services-auth:21.2.0")

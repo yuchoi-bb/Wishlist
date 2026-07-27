@@ -11,3 +11,6 @@ captures/
 *.ap_
 *.dex
 /app/build/
+
+# Contains this Firebase project's identifiers; this repo is public, keep it local per-checkout.
+/app/google-services.json

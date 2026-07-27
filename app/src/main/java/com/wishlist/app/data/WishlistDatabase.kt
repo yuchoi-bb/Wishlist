@@ -7,13 +7,12 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 
 @Database(
-    entities = [WishlistItem::class, CategorySortPref::class],
-    version = 1,
+    entities = [CategorySortPref::class],
+    version = 2,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
 abstract class WishlistDatabase : RoomDatabase() {
-    abstract fun wishlistDao(): WishlistDao
     abstract fun categorySortPrefDao(): CategorySortPrefDao
 
     companion object {
@@ -26,7 +25,10 @@ abstract class WishlistDatabase : RoomDatabase() {
                     context.applicationContext,
                     WishlistDatabase::class.java,
                     "wishlist.db",
-                ).build().also { instance = it }
+                )
+                    // Items moved from this local table to Firestore; older installs can just drop it.
+                    .fallbackToDestructiveMigration()
+                    .build().also { instance = it }
             }
     }
 }

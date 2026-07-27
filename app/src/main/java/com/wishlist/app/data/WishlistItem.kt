@@ -1,16 +1,13 @@
 package com.wishlist.app.data
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
-
-@Entity(tableName = "wishlist_items")
+/** Stored as a Firestore document under users/{uid}/wishlist_items/{id}; id is "" for a not-yet-saved item. */
 data class WishlistItem(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val title: String,
+    val id: String = "",
+    val title: String = "",
     val majorCategory: String? = null,
     val minorCategory: String? = null,
     /** "고민을 시작한 시간" — defaults to creation time, user-editable. */
-    val startedAt: Long,
+    val startedAt: Long = 0,
     /** "완료일자" — null means still in progress. Set/cleared by the user or the complete checkbox. */
     val completedAt: Long? = null,
 ) {

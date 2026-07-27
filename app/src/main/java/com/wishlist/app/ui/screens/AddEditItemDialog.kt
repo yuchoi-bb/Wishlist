@@ -139,7 +139,7 @@ fun AddEditItemDialog(
                         onClick = {
                             onSave(
                                 WishlistItem(
-                                    id = editingItem?.id ?: 0,
+                                    id = editingItem?.id ?: "",
                                     title = title.trim(),
                                     majorCategory = majorCategory.trim().ifBlank { null },
                                     minorCategory = minorCategory.trim().ifBlank { null },

@@ -10,17 +10,24 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.wishlist.app.data.WishlistItem
 import com.wishlist.app.ui.screens.AddEditItemDialog
 import com.wishlist.app.ui.screens.SettingsScreen
+import com.wishlist.app.ui.screens.SignInScreen
 import com.wishlist.app.ui.screens.WishlistListScreen
 
 @Composable
 fun WishlistRoot(viewModel: WishlistViewModel = viewModel()) {
+    val currentUser by viewModel.authManager.currentUser.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showSettings by remember { mutableStateOf(false) }
     var showAddEdit by remember { mutableStateOf(false) }
     var editingItem by remember { mutableStateOf<WishlistItem?>(null) }
 
+    if (currentUser == null) {
+        SignInScreen(authManager = viewModel.authManager)
+        return
+    }
+
     if (showSettings) {
-        SettingsScreen(onBack = { showSettings = false })
+        SettingsScreen(authManager = viewModel.authManager, onBack = { showSettings = false })
         return
     }
 
