@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.common.api.ApiException
 import com.wishlist.app.auth.AuthManager
 import kotlinx.coroutines.launch
 
@@ -34,15 +35,29 @@ fun SignInScreen(authManager: AuthManager) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val signInLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val account = runCatching { GoogleSignIn.getSignedInAccountFromIntent(result.data).result }.getOrNull()
+        // Report the real reason rather than swallowing it: Google Sign-In signals config problems
+        // through ApiException status codes (10 = DEVELOPER_ERROR, i.e. SHA-1/client-ID mismatch;
+        // 12501 = user cancelled), which are otherwise invisible without logcat.
+        val account = try {
+            GoogleSignIn.getSignedInAccountFromIntent(result.data).getResult(ApiException::class.java)
+        } catch (e: ApiException) {
+            errorMessage = "Google 로그인 실패 (코드 ${e.statusCode}): ${e.message}"
+            null
+        }
         if (account == null) {
-            errorMessage = "로그인이 취소되었거나 실패했습니다."
+            if (errorMessage == null) errorMessage = "로그인이 취소되었거나 실패했습니다."
+            return@rememberLauncherForActivityResult
+        }
+        if (account.idToken == null) {
+            errorMessage = "ID 토큰을 받지 못했습니다. Firebase 콘솔에서 Google 로그인 설정과 SHA-1 등록을 확인해주세요."
             return@rememberLauncherForActivityResult
         }
         scope.launch {
-            val user = authManager.signInWithGoogle(account)
-            if (user == null) {
-                errorMessage = "Firebase 로그인에 실패했습니다."
+            val user = runCatching { authManager.signInWithGoogle(account) }
+            errorMessage = when {
+                user.isFailure -> "Firebase 로그인 실패: ${user.exceptionOrNull()?.message}"
+                user.getOrNull() == null -> "Firebase 로그인에 실패했습니다."
+                else -> null
             }
         }
     }

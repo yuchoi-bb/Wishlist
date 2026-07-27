@@ -61,6 +61,9 @@ class AuthManager(context: Context) {
      */
     fun signInClient(context: Context): GoogleSignInClient {
         val builder = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            // DEFAULT_SIGN_IN covers id + basic profile but NOT email, so without this the signed-in
+            // FirebaseUser comes back with a null email and the account shows as "알 수 없음".
+            .requestEmail()
             .requestScopes(Scope(DriveScopes.DRIVE_APPDATA))
         webClientId?.let { builder.requestIdToken(it) }
         return GoogleSignIn.getClient(context, builder.build())

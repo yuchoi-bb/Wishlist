@@ -76,7 +76,12 @@ fun SettingsScreen(authManager: AuthManager, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text("계정", style = MaterialTheme.typography.titleMedium)
-            Text("로그인: ${currentUser?.email ?: "알 수 없음"}", style = MaterialTheme.typography.bodySmall)
+            // Falls back through displayName/uid: email is null unless the sign-in requested it,
+            // and a bare "알 수 없음" made a working sign-in look broken.
+            val accountLabel = currentUser?.let { user ->
+                user.email ?: user.displayName ?: "uid ${user.uid.take(8)}…"
+            } ?: "로그인되지 않음"
+            Text("로그인: $accountLabel", style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = {
                 GoogleSignIn.getClient(context, GoogleSignInOptions.DEFAULT_SIGN_IN).signOut()
                 authManager.signOut()
