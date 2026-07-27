@@ -73,6 +73,26 @@ android {
     }
 }
 
+// Something elsewhere in the graph pulls grpc-api/grpc-context up to 1.66.0 while grpc-core,
+// grpc-android, grpc-okhttp etc. (via firebase-firestore) stay on 1.62.2, which Firestore was
+// actually built and tested against. The resulting version-skewed combo crashes at runtime with
+// NoClassDefFoundError: io.grpc.InternalGlobalInterceptors. Force every grpc-* artifact back to
+// the one Firestore expects so they're all consistent again.
+configurations.all {
+    resolutionStrategy {
+        force(
+            "io.grpc:grpc-android:1.62.2",
+            "io.grpc:grpc-api:1.62.2",
+            "io.grpc:grpc-context:1.62.2",
+            "io.grpc:grpc-core:1.62.2",
+            "io.grpc:grpc-okhttp:1.62.2",
+            "io.grpc:grpc-protobuf-lite:1.62.2",
+            "io.grpc:grpc-stub:1.62.2",
+            "io.grpc:grpc-util:1.62.2",
+        )
+    }
+}
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.09.02")
     implementation(composeBom)
