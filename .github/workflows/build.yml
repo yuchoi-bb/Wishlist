@@ -16,6 +16,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Kept out of the repo (public) since it's per-Firebase-project; stored as a base64 secret
+      # instead. Forks/PRs without the secret just build without Firebase configured, same as
+      # the conditional google-services plugin apply in app/build.gradle.kts.
+      - name: Write google-services.json
+        if: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > app/google-services.json
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

@@ -32,7 +32,22 @@ android {
         buildConfig = true
     }
 
+    signingConfigs {
+        getByName("debug") {
+            // Checked-in on purpose: debug keys aren't sensitive, and a stable one keeps the
+            // debug APK's signing fingerprint (and thus the SHA-1 registered for Google Sign-In)
+            // the same across every CI build instead of a fresh, different one each run.
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
