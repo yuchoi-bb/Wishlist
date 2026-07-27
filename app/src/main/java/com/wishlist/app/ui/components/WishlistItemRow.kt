@@ -6,19 +6,20 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wishlist.app.data.WishlistItem
+import com.wishlist.app.util.formatDate
 import com.wishlist.app.util.formatPonderedDuration
 import kotlinx.coroutines.delay
 
@@ -55,11 +56,11 @@ fun WishlistItemRow(
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(text = item.title, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    text = "고민 시작: ${formatEpochMillis(item.startedAt)}",
+                    text = "시작일: ${formatDate(item.startedAt)}",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 val statusText = if (item.isCompleted) {
-                    "완료: ${formatEpochMillis(item.completedAt!!)}"
+                    "완료일: ${formatDate(item.completedAt!!)}"
                 } else {
                     "진행 중"
                 }
@@ -69,6 +70,21 @@ fun WishlistItemRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
+
+                if (item.subItems.isNotEmpty()) {
+                    Text(
+                        text = "세부항목: ${item.doneSubItemCount}/${item.subItems.size} 완료",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                item.memo?.takeIf { it.isNotBlank() }?.let { memo ->
+                    Text(
+                        text = memo,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }

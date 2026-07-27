@@ -33,7 +33,6 @@ fun WishlistRoot(viewModel: WishlistViewModel = viewModel()) {
 
     WishlistListScreen(
         uiState = uiState,
-        onSearchQueryChange = viewModel::onSearchQueryChange,
         onStatusFilterChange = viewModel::onStatusFilterChange,
         onSortFieldSelected = { group, field ->
             viewModel.onSortChange(group.categoryKey, field, group.sortField, group.ascending)

@@ -34,7 +34,6 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
         ?.let { FirestoreWishlistRepository(it) }
     private val repository = WishlistRepository(firestoreRepository, db.categorySortPrefDao())
 
-    private val searchQuery = MutableStateFlow("")
     private val statusFilter = MutableStateFlow(StatusFilter.ALL)
 
     val uiState: StateFlow<WishlistUiState> = authManager.currentUser
@@ -44,13 +43,11 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
                 flowOf(WishlistUiState(isLoading = false))
             } else {
                 combine(
-                    repository.observeGroups(uid, searchQuery, statusFilter),
-                    searchQuery,
+                    repository.observeGroups(uid, statusFilter),
                     statusFilter,
-                ) { groups, query, filter ->
+                ) { groups, filter ->
                     WishlistUiState(
                         groups = groups,
-                        searchQuery = query,
                         statusFilter = filter,
                         majorCategories = groups.mapNotNull { it.majorCategory }.distinct().sorted(),
                         isLoading = false,
@@ -59,10 +56,6 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), WishlistUiState())
-
-    fun onSearchQueryChange(query: String) {
-        searchQuery.value = query
-    }
 
     fun onStatusFilterChange(filter: StatusFilter) {
         statusFilter.value = filter

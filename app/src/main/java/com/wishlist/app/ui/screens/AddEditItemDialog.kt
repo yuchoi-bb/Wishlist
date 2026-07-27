@@ -12,8 +12,13 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -21,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -29,9 +35,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.wishlist.app.data.SubItem
 import com.wishlist.app.data.WishlistItem
-import com.wishlist.app.ui.components.DateTimeField
 import com.wishlist.app.ui.WishlistViewModel
+import com.wishlist.app.ui.components.DateField
+import com.wishlist.app.util.todayStartOfDayMillis
 
 @Composable
 fun AddEditItemDialog(
@@ -43,11 +51,13 @@ fun AddEditItemDialog(
     onDelete: (WishlistItem) -> Unit,
 ) {
     var title by remember { mutableStateOf(editingItem?.title.orEmpty()) }
+    var memo by remember { mutableStateOf(editingItem?.memo.orEmpty()) }
     var majorCategory by remember { mutableStateOf(editingItem?.majorCategory.orEmpty()) }
     var minorCategory by remember { mutableStateOf(editingItem?.minorCategory.orEmpty()) }
-    var startedAt by remember { mutableStateOf(editingItem?.startedAt ?: System.currentTimeMillis()) }
-    var completed by remember { mutableStateOf(editingItem?.isCompleted ?: false) }
-    var completedAt by remember { mutableStateOf(editingItem?.completedAt ?: System.currentTimeMillis()) }
+    var startedAt by remember { mutableStateOf(editingItem?.startedAt ?: todayStartOfDayMillis()) }
+    var completedAt by remember { mutableStateOf(editingItem?.completedAt) }
+    val subItems = remember { mutableStateListOf<SubItem>().apply { addAll(editingItem?.subItems.orEmpty()) } }
+    var newSubItemTitle by remember { mutableStateOf("") }
 
     val minorSuggestions by if (majorCategory.isNotBlank()) {
         viewModel.observeMinorCategories(majorCategory).collectAsStateWithLifecycle(initialValue = emptyList())
@@ -78,6 +88,60 @@ fun AddEditItemDialog(
                 Spacer(Modifier.height(12.dp))
 
                 OutlinedTextField(
+                    value = memo,
+                    onValueChange = { memo = it },
+                    label = { Text("메모") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 5,
+                )
+                Spacer(Modifier.height(16.dp))
+
+                Text("세부항목", style = MaterialTheme.typography.titleSmall)
+                subItems.forEachIndexed { index, subItem ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = subItem.done,
+                            onCheckedChange = { subItems[index] = subItem.copy(done = it) },
+                        )
+                        OutlinedTextField(
+                            value = subItem.title,
+                            onValueChange = { subItems[index] = subItem.copy(title = it) },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                        )
+                        IconButton(onClick = { subItems.removeAt(index) }) {
+                            Icon(Icons.Filled.Close, contentDescription = "세부항목 삭제")
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedTextField(
+                        value = newSubItemTitle,
+                        onValueChange = { newSubItemTitle = it },
+                        label = { Text("세부항목 추가") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                    )
+                    IconButton(
+                        enabled = newSubItemTitle.isNotBlank(),
+                        onClick = {
+                            subItems.add(SubItem(title = newSubItemTitle.trim()))
+                            newSubItemTitle = ""
+                        },
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "세부항목 추가")
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+
+                OutlinedTextField(
                     value = majorCategory,
                     onValueChange = { majorCategory = it },
                     label = { Text("대분류") },
@@ -101,27 +165,25 @@ fun AddEditItemDialog(
                 }
                 Spacer(Modifier.height(16.dp))
 
-                DateTimeField(
-                    label = "고민을 시작한 시간",
+                DateField(
+                    label = "시작일",
                     epochMillis = startedAt,
                     onValueChange = { startedAt = it },
                 )
                 Spacer(Modifier.height(16.dp))
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = completed, onCheckedChange = { completed = it })
-                    Text("완료됨")
-                }
-                if (completed) {
-                    DateTimeField(
-                        label = "완료일자",
-                        epochMillis = completedAt,
-                        onValueChange = { completedAt = it },
-                        trailingContent = {
-                            TextButton(onClick = { completed = false }) { Text("진행 중으로 변경") }
-                        },
-                    )
-                }
+                // Setting a 완료일 is what marks the item complete; clearing it returns it to 진행 중.
+                DateField(
+                    label = "완료일",
+                    epochMillis = completedAt,
+                    emptyLabel = "진행 중 (탭하여 완료일 지정)",
+                    onValueChange = { completedAt = it },
+                    trailingContent = {
+                        if (completedAt != null) {
+                            TextButton(onClick = { completedAt = null }) { Text("지우기") }
+                        }
+                    },
+                )
                 Spacer(Modifier.height(20.dp))
 
                 Row(
@@ -141,10 +203,12 @@ fun AddEditItemDialog(
                                 WishlistItem(
                                     id = editingItem?.id ?: "",
                                     title = title.trim(),
+                                    memo = memo.trim().ifBlank { null },
+                                    subItems = subItems.filter { it.title.isNotBlank() },
                                     majorCategory = majorCategory.trim().ifBlank { null },
                                     minorCategory = minorCategory.trim().ifBlank { null },
                                     startedAt = startedAt,
-                                    completedAt = if (completed) completedAt else null,
+                                    completedAt = completedAt,
                                 ),
                             )
                         },

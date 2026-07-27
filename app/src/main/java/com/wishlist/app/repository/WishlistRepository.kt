@@ -45,30 +45,26 @@ class WishlistRepository(
     private fun itemsFlow(uid: String): Flow<List<WishlistItem>> =
         firestoreRepository?.observeItems(uid) ?: flowOf(emptyList())
 
-    /** Combines real-time Firestore items, per-category sort prefs, search query and status filter
-     * into grouped, sorted UI state. */
+    /** Combines real-time Firestore items, per-category sort prefs and the status filter into
+     * grouped, sorted UI state. */
     fun observeGroups(
         uid: String,
-        searchQuery: Flow<String>,
         statusFilter: Flow<StatusFilter>,
     ): Flow<List<CategoryGroup>> =
         combine(
             itemsFlow(uid),
             sortPrefDao.observeAll(),
-            searchQuery,
             statusFilter,
-        ) { items, prefs, query, filter ->
+        ) { items, prefs, filter ->
             val prefsByKey = prefs.associateBy { it.categoryKey }
             val now = System.currentTimeMillis()
 
             val filtered = items.filter { item ->
-                val matchesStatus = when (filter) {
+                when (filter) {
                     StatusFilter.ALL -> true
                     StatusFilter.IN_PROGRESS -> !item.isCompleted
                     StatusFilter.COMPLETED -> item.isCompleted
                 }
-                val matchesQuery = query.isBlank() || item.title.contains(query, ignoreCase = true)
-                matchesStatus && matchesQuery
             }
 
             filtered
@@ -99,7 +95,7 @@ class WishlistRepository(
         }
     }
 
-    /** In-progress (no 완료일자) items always sink to the bottom, regardless of chosen direction. */
+    /** In-progress (no 완료일) items always sink to the bottom, regardless of chosen direction. */
     private fun sortGroupItems(
         items: List<WishlistItem>,
         field: SortField,

@@ -1,14 +1,24 @@
 package com.wishlist.app.data
 
+/** One checkable detail row under a wishlist item. */
+data class SubItem(
+    val title: String = "",
+    val done: Boolean = false,
+)
+
 /** Stored as a Firestore document under users/{uid}/wishlist_items/{id}; id is "" for a not-yet-saved item. */
 data class WishlistItem(
     val id: String = "",
     val title: String = "",
+    /** Free-form notes for this item. */
+    val memo: String? = null,
+    /** Checkable detail rows under this item. */
+    val subItems: List<SubItem> = emptyList(),
     val majorCategory: String? = null,
     val minorCategory: String? = null,
-    /** "고민을 시작한 시간" — defaults to creation time, user-editable. */
+    /** "시작일" — date only (local start-of-day), defaults to the creation date, user-editable. */
     val startedAt: Long = 0,
-    /** "완료일자" — null means still in progress. Set/cleared by the user or the complete checkbox. */
+    /** "완료일" — date only, null means still in progress. */
     val completedAt: Long? = null,
 ) {
     val isCompleted: Boolean get() = completedAt != null
@@ -18,6 +28,8 @@ data class WishlistItem(
         val end = completedAt ?: now
         return (end - startedAt).coerceAtLeast(0)
     }
+
+    val doneSubItemCount: Int get() = subItems.count { it.done }
 
     /** Key identifying which category group this item belongs to for grouping + per-group sort. */
     val categoryKey: String

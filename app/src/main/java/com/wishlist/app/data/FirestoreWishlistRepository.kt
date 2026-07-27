@@ -2,6 +2,7 @@ package com.wishlist.app.data
 
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import com.wishlist.app.util.toStartOfDayMillis
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -50,16 +51,33 @@ class FirestoreWishlistRepository(private val firestore: FirebaseFirestore) {
 private fun DocumentSnapshot.toWishlistItem(): WishlistItem = WishlistItem(
     id = id,
     title = getString("title") ?: "",
+    memo = getString("memo"),
+    subItems = readSubItems(),
     majorCategory = getString("majorCategory"),
     minorCategory = getString("minorCategory"),
     startedAt = getLong("startedAt") ?: 0L,
     completedAt = getLong("completedAt"),
 )
 
+@Suppress("UNCHECKED_CAST")
+private fun DocumentSnapshot.readSubItems(): List<SubItem> {
+    val raw = get("subItems") as? List<Map<String, Any?>> ?: return emptyList()
+    return raw.map { entry ->
+        SubItem(
+            title = entry["title"] as? String ?: "",
+            done = entry["done"] as? Boolean ?: false,
+        )
+    }
+}
+
 private fun WishlistItem.toFirestoreMap(): Map<String, Any?> = mapOf(
     "title" to title,
+    "memo" to memo,
+    "subItems" to subItems.map { mapOf("title" to it.title, "done" to it.done) },
     "majorCategory" to majorCategory,
     "minorCategory" to minorCategory,
-    "startedAt" to startedAt,
-    "completedAt" to completedAt,
+    // Normalized on every write, so items created before 시작일/완료일 became date-only (and any
+    // restored from an older backup) get cleaned up the next time they're saved.
+    "startedAt" to startedAt.toStartOfDayMillis(),
+    "completedAt" to completedAt?.toStartOfDayMillis(),
 )

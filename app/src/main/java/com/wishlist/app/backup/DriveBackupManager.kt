@@ -13,6 +13,7 @@ import com.google.api.services.drive.model.File as DriveFile
 import com.wishlist.app.data.CategorySortPref
 import com.wishlist.app.data.FirestoreWishlistRepository
 import com.wishlist.app.data.SortField
+import com.wishlist.app.data.SubItem
 import com.wishlist.app.data.WishlistDatabase
 import com.wishlist.app.data.WishlistItem
 import java.io.ByteArrayOutputStream
@@ -111,6 +112,18 @@ class DriveBackupManager(
 private fun WishlistItem.toJson(): JSONObject = JSONObject().apply {
     put("id", id)
     put("title", title)
+    put("memo", memo)
+    put(
+        "subItems",
+        JSONArray(
+            subItems.map { sub ->
+                JSONObject().apply {
+                    put("title", sub.title)
+                    put("done", sub.done)
+                }
+            },
+        ),
+    )
     put("majorCategory", majorCategory)
     put("minorCategory", minorCategory)
     put("startedAt", startedAt)
@@ -120,6 +133,13 @@ private fun WishlistItem.toJson(): JSONObject = JSONObject().apply {
 private fun JSONObject.toWishlistItem(): WishlistItem = WishlistItem(
     id = optString("id", ""),
     title = getString("title"),
+    memo = if (isNull("memo")) null else optString("memo"),
+    subItems = optJSONArray("subItems")?.let { array ->
+        (0 until array.length()).map { i ->
+            val entry = array.getJSONObject(i)
+            SubItem(title = entry.optString("title"), done = entry.optBoolean("done"))
+        }
+    }.orEmpty(),
     majorCategory = if (isNull("majorCategory")) null else optString("majorCategory"),
     minorCategory = if (isNull("minorCategory")) null else optString("minorCategory"),
     startedAt = getLong("startedAt"),

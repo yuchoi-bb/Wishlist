@@ -16,7 +16,6 @@ data class CategoryGroup(
 
 data class WishlistUiState(
     val groups: List<CategoryGroup> = emptyList(),
-    val searchQuery: String = "",
     val statusFilter: StatusFilter = StatusFilter.ALL,
     val majorCategories: List<String> = emptyList(),
     val isLoading: Boolean = true,
