@@ -38,12 +38,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             WishlistTheme {
                 val context = LocalContext.current
-                var crashTrace by remember { mutableStateOf(CrashLog.readAndClear(context)) }
+                var crash by remember { mutableStateOf(CrashLog.readAndClear(context)) }
 
-                if (crashTrace != null) {
+                if (crash != null) {
                     // Shown instead of the normal screen so a crash-on-launch bug still surfaces
                     // this, rather than looping straight back into whatever just crashed.
-                    CrashScreen(trace = crashTrace!!, onDismiss = { crashTrace = null })
+                    CrashScreen(crash = crash!!, onDismiss = { crash = null })
                 } else {
                     WishlistRoot()
                 }
