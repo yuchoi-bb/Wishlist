@@ -5,7 +5,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
-private val dateFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd")
+// Two-digit year: the table has to fit eight columns on a phone, and the century is never in doubt.
+private val dateFormatter = DateTimeFormatter.ofPattern("yy.MM.dd")
 private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm")
 
 /**

@@ -47,17 +47,23 @@ import com.wishlist.app.ui.theme.categoryColor
 import com.wishlist.app.util.formatDate
 import com.wishlist.app.util.formatRemainingDays
 
-/** Column widths, shared by the header and every row so the grid lines up. */
+/**
+ * Column widths, shared by the header and every row so the grid lines up. Kept as tight as the
+ * content allows — every column that isn't needed pushes the rest off the side of a phone.
+ */
 private object Col {
-    val major = 84.dp
-    val minor = 84.dp
-    val title = 128.dp
-    val subItem = 140.dp
-    val endDate = 104.dp
-    val remaining = 64.dp
-    val priority = 44.dp
+    val major = 52.dp
+    val minor = 52.dp
+    val title = 100.dp
+    val subItem = 124.dp
+    val endDate = 80.dp
+    val remaining = 56.dp
+    val priority = 40.dp
     val done = 44.dp
 }
+
+/** Breathing room inside a cell; the grid is dense on purpose. */
+private val CELL_PADDING = 4.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -150,7 +156,7 @@ private fun HeaderRow(
         HeaderCell("대/중분류", Col.major + Col.minor, SortField.CATEGORY, sortField, ascending, onSortSelected)
         HeaderCell("할 일", Col.title, SortField.TITLE, sortField, ascending, onSortSelected)
         HeaderCell("세부항목", Col.subItem, SortField.SUB_ITEM, sortField, ascending, onSortSelected)
-        HeaderCell("완료예정일", Col.endDate, SortField.END_DATE, sortField, ascending, onSortSelected)
+        HeaderCell("예정일", Col.endDate, SortField.END_DATE, sortField, ascending, onSortSelected)
         HeaderCell("남은날짜", Col.remaining, null, sortField, ascending, onSortSelected)
         HeaderCell("순위", Col.priority, SortField.PRIORITY, sortField, ascending, onSortSelected)
         HeaderCell("완료", Col.done, null, sortField, ascending, onSortSelected)
@@ -172,7 +178,7 @@ private fun HeaderCell(
         modifier = Modifier
             .width(width)
             .then(if (field != null) Modifier.clickable { onSortSelected(field) } else Modifier)
-            .padding(horizontal = 6.dp),
+            .padding(horizontal = CELL_PADDING),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -223,7 +229,7 @@ private fun DataRow(
         modifier = Modifier
             .height(IntrinsicSize.Min)
             .background(background)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Everything except the done checkbox opens the editor, which always shows the whole 항목
@@ -245,7 +251,7 @@ private fun DataRow(
             background = categoryCellBackground,
         )
         Cell(if (isChild) "" else row.item.title, Col.title, strike, onClick, weight = weight)
-        Cell(subItemLabel(row), Col.subItem, strike, onClick, indent = if (isChild) 14.dp else 0.dp)
+        Cell(subItemLabel(row), Col.subItem, strike, onClick, indent = if (isChild) 8.dp else 0.dp)
         Cell(row.effectiveEndDate?.let { formatDate(it) } ?: "-", Col.endDate, strike, onClick)
         Cell(
             text = if (row.isDone) "완료" else formatRemainingDays(row.effectiveEndDate),
@@ -289,7 +295,7 @@ private fun Cell(
             .fillMaxHeight()
             .background(background)
             .clickable(onClick = onClick)
-            .padding(start = 6.dp + indent, end = 6.dp),
+            .padding(start = CELL_PADDING + indent, end = CELL_PADDING),
         contentAlignment = Alignment.CenterStart,
     ) {
         Text(
