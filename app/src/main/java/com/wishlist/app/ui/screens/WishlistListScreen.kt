@@ -107,10 +107,17 @@ fun WishlistListScreen(
             val moved = rows.getOrNull(from)
             val target = rows.getOrNull(to)
             when {
-                moved is ListRow.Header && target != null ->
-                    moveGroup(rows, moved.categoryKey, target.categoryKey)?.let { (newRows, newIndex) ->
-                        rows = newRows
-                        newIndex
+                // A dragged header carries its whole group. Rows of its own group are not targets:
+                // the finger has to travel over them to reach anywhere else, and treating them as
+                // a move would drop the group drag before it ever left home.
+                moved is ListRow.Header ->
+                    if (target == null || target.categoryKey == moved.categoryKey) {
+                        null
+                    } else {
+                        moveGroup(rows, moved.categoryKey, target.categoryKey)?.let { (newRows, newIndex) ->
+                            rows = newRows
+                            newIndex
+                        }
                     }
 
                 moved is ListRow.Entry && target is ListRow.Entry &&
@@ -145,6 +152,11 @@ fun WishlistListScreen(
             rows = buildRows(uiState.groups)
         }
     }
+
+    // Set only while a category header is being dragged, so its items can travel with it.
+    val draggedGroupKey = dragDropState.draggingItemIndex
+        ?.let { rows.getOrNull(it) as? ListRow.Header }
+        ?.categoryKey
 
     Scaffold(
         topBar = {
@@ -202,8 +214,12 @@ fun WishlistListScreen(
                         },
                     ) { index, row ->
                         val dragging = index == dragDropState.draggingItemIndex
+                        // Dragging a header takes its group with it, so every row of that group
+                        // travels under the finger too — otherwise the header alone appears to
+                        // float away from its items.
+                        val movesWithGroup = draggedGroupKey != null && row.categoryKey == draggedGroupKey
                         val rowModifier = Modifier.graphicsLayer {
-                            if (dragging) {
+                            if (dragging || movesWithGroup) {
                                 translationY = dragDropState.draggingItemOffset
                                 // Lift the dragged row above its neighbours while it moves.
                                 shadowElevation = 8f

@@ -24,8 +24,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
  * [canDrag] gates which rows participate. [onMove] is called on every swap so the list rearranges
  * while the finger is down, and returns where the dragged row ended up — dragging a category
  * header moves that whole group as a block, so its new index is not simply the target's. Returning
- * null means "it landed on the target index". [onDragFinished] is where the result should be
- * persisted, so one drag is one write.
+ * null means "this move was rejected", leaving the drag on the row it was already on.
+ * [onDragFinished] is where the result should be persisted, so one drag is one write.
  */
 @Composable
 fun rememberDragDropState(
@@ -96,7 +96,10 @@ class DragDropState internal constructor(
         }
 
         if (target != null) {
-            draggingItemIndex = onMove(dragging.index, target.index) ?: target.index
+            // A rejected move keeps the finger on the row it started with. Falling back to the
+            // target's index would hand the drag over to whatever was hovered — which is exactly
+            // what broke dragging a category header across its own items.
+            draggingItemIndex = onMove(dragging.index, target.index) ?: dragging.index
         } else {
             // Nothing to swap with: near an edge, scroll the list instead so long lists stay reachable.
             val overscroll = when {
