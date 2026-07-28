@@ -195,14 +195,32 @@ fun SettingsScreen(authManager: AuthManager, onBack: () -> Unit) {
 
             Text("자동 업데이트", style = MaterialTheme.typography.titleMedium)
             Text("현재 버전: ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodySmall)
+            // Same path the launch-time updater takes, just started by hand: download (or reuse an
+            // APK already on disk) and go straight to the installer.
             OutlinedButton(onClick = {
                 scope.launch {
+                    statusMessage = "업데이트 확인 중…"
                     val update = updateChecker.checkForUpdate()
-                    if (update != null) {
-                        updateChecker.downloadUpdate(update)
-                        statusMessage = "새 버전 ${update.version} 다운로드를 시작했습니다"
-                    } else {
+                    if (update == null) {
                         statusMessage = "최신 버전을 사용 중입니다"
+                        return@launch
+                    }
+                    val apk = updateChecker.downloadedApk(update) ?: run {
+                        val id = updateChecker.startDownload(update)
+                        updateChecker.awaitDownload(id, update.version) { percent ->
+                            statusMessage = "새 버전 ${update.version} 받는 중 $percent%"
+                        }
+                    }
+                    statusMessage = when {
+                        apk == null -> "다운로드에 실패했습니다"
+                        updateChecker.canInstall() -> {
+                            context.startActivity(updateChecker.installIntent(apk))
+                            "새 버전 ${update.version} 설치를 시작합니다"
+                        }
+                        else -> {
+                            context.startActivity(updateChecker.installPermissionIntent())
+                            "설치를 허용한 뒤 다시 눌러주세요"
+                        }
                     }
                 }
             }) {

@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <cache-path name="updates" path="updates/" />
+    <!-- Where DownloadManager drops the update APK, so the installer can be handed a content URI. -->
+    <external-files-path name="update_downloads" path="Download/" />
 </paths>
