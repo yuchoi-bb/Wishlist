@@ -128,6 +128,24 @@ class UpdateChecker(private val context: Context) {
         finished
     }
 
+    /**
+     * Deletes downloaded APKs that are no longer needed — anything at or below the version now
+     * running. The file cannot be removed at install time (the installer is still reading it, and
+     * this process is replaced), so the cleanup happens on the next launch: once the update is
+     * installed, the app comes back as that version and its APK is obsolete by this rule. An APK
+     * newer than what's running is kept, since it's an update the user hasn't accepted yet.
+     */
+    suspend fun deleteInstalledApks(): Unit = withContext(Dispatchers.IO) {
+        val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: return@withContext
+        dir.listFiles()?.forEach { file ->
+            val isOurApk = file.name.startsWith(APK_PREFIX) && file.name.endsWith(APK_SUFFIX)
+            val version = file.name.removeSurrounding(APK_PREFIX, APK_SUFFIX)
+            if (isOurApk && !isNewerVersion(version, BuildConfig.VERSION_NAME)) {
+                file.delete()
+            }
+        }
+    }
+
     /** False until the user has allowed this app to install packages — a once-per-device switch. */
     fun canInstall(): Boolean = context.packageManager.canRequestPackageInstalls()
 
@@ -146,7 +164,7 @@ class UpdateChecker(private val context: Context) {
         Uri.parse("package:${context.packageName}"),
     )
 
-    private fun apkFileName(version: String) = "wishlist-$version.apk"
+    private fun apkFileName(version: String) = "$APK_PREFIX$version$APK_SUFFIX"
 
     private fun apkFile(version: String) =
         File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), apkFileName(version))
@@ -174,5 +192,7 @@ class UpdateChecker(private val context: Context) {
     private companion object {
         const val APK_MIME_TYPE = "application/vnd.android.package-archive"
         const val POLL_INTERVAL_MS = 400L
+        const val APK_PREFIX = "wishlist-"
+        const val APK_SUFFIX = ".apk"
     }
 }

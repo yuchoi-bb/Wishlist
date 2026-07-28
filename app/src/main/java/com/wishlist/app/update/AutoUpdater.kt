@@ -65,6 +65,9 @@ fun AutoUpdater(modifier: Modifier = Modifier) {
     }
 
     LaunchedEffect(Unit) {
+        // First thing on launch: after an update installs, the app restarts as the new version and
+        // the APK it came from is dead weight.
+        checker.deleteInstalledApks()
         val update = checker.checkForUpdate() ?: return@LaunchedEffect
         // A finished download from an earlier launch is reused, so declining the installer once
         // doesn't mean fetching the whole APK again next time.
