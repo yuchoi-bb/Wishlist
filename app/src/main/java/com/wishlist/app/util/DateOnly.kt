@@ -40,16 +40,22 @@ fun endOfMonthMillis(monthsAhead: Int, now: Long = System.currentTimeMillis()): 
 }
 
 /**
- * Label for a 월말 shortcut. "8월말" would be three characters wide in every chip, so a chip carries
- * only the month number and the row is captioned 월말 once — 이달 for the current month.
+ * Label for a 월말 shortcut, kept to two characters: 월말 for the current month, then the month
+ * followed by 말. Months 10–12 would spill to three characters as digits, so they use A/B/C.
  */
 fun monthEndLabel(monthsAhead: Int, now: Long = System.currentTimeMillis()): String {
-    if (monthsAhead == 0) return "이달"
+    if (monthsAhead == 0) return "월말"
     val zone = ZoneId.systemDefault()
-    return Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+    val month = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
         .plusMonths(monthsAhead.toLong())
         .monthValue
-        .toString()
+    val symbol = when (month) {
+        10 -> "A"
+        11 -> "B"
+        12 -> "C"
+        else -> month.toString()
+    }
+    return "$symbol말"
 }
 
 /** Countdown to a 종료일: "D-3" with days to go, "D-DAY" today, "D+2" once it's past. */

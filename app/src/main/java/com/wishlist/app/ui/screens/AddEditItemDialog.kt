@@ -74,8 +74,28 @@ fun AddEditItemDialog(
     var endDate by remember { mutableStateOf(editingItem?.endDate) }
     var isDone by remember { mutableStateOf(editingItem?.isDone ?: false) }
     var priority by remember { mutableIntStateOf(editingItem?.priority ?: WishlistItem.DEFAULT_PRIORITY) }
-    val subItems = remember { mutableStateListOf<SubItem>().apply { addAll(editingItem?.subItems.orEmpty()) } }
+    // A 세부항목 with no date of its own starts from its parent 항목's 최종 종료일, so the table has a
+    // real 완료예정일 to sort by instead of an empty cell. It stays editable per 세부항목.
+    val subItems = remember {
+        mutableStateListOf<SubItem>().apply {
+            addAll(
+                editingItem?.subItems.orEmpty().map { sub ->
+                    if (sub.endDate == null) sub.copy(endDate = editingItem?.endDate) else sub
+                },
+            )
+        }
+    }
     var newSubItemTitle by remember { mutableStateOf("") }
+
+    /** Setting the 항목's date also fills in any 세부항목 that still has none. */
+    val setItemEndDate: (Long?) -> Unit = { value ->
+        endDate = value
+        if (value != null) {
+            subItems.forEachIndexed { index, sub ->
+                if (sub.endDate == null) subItems[index] = sub.copy(endDate = value)
+            }
+        }
+    }
 
     val minorSuggestions by if (majorCategory.isNotBlank()) {
         viewModel.observeMinorCategories(majorCategory).collectAsStateWithLifecycle(initialValue = emptyList())
@@ -123,14 +143,14 @@ fun AddEditItemDialog(
                     label = "최종 종료일 (목표일)",
                     epochMillis = endDate,
                     emptyLabel = "지정 안 됨 (탭하여 선택)",
-                    onValueChange = { endDate = it },
+                    onValueChange = setItemEndDate,
                     trailingContent = {
                         if (endDate != null) {
                             TextButton(onClick = { endDate = null }) { Text("지우기") }
                         }
                     },
                 )
-                MonthEndChips(selected = endDate, onSelect = { endDate = it })
+                MonthEndChips(selected = endDate, onSelect = setItemEndDate)
                 Spacer(Modifier.height(16.dp))
 
                 Text("세부항목", style = MaterialTheme.typography.titleSmall)
@@ -189,9 +209,9 @@ fun AddEditItemDialog(
                     IconButton(
                         enabled = newSubItemTitle.isNotBlank(),
                         onClick = {
-                            // The new row appears with its own 월말 chips right above this field, so
-                            // the date can be set in one more tap.
-                            subItems.add(SubItem(title = newSubItemTitle.trim()))
+                            // Starts from the 항목's 최종 종료일 and appears with its own 월말 chips
+                            // right above this field, so a different date is one more tap away.
+                            subItems.add(SubItem(title = newSubItemTitle.trim(), endDate = endDate))
                             newSubItemTitle = ""
                         },
                     ) {
