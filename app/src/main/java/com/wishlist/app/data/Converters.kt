@@ -7,6 +7,5 @@ class Converters {
     fun sortFieldToString(value: SortField): String = value.name
 
     @TypeConverter
-    fun stringToSortField(value: String): SortField =
-        runCatching { SortField.valueOf(value) }.getOrDefault(SortField.END_DATE)
+    fun stringToSortField(value: String): SortField = SortField.fromStoredName(value)
 }

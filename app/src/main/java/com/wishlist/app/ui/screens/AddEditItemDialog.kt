@@ -122,9 +122,9 @@ fun AddEditItemDialog(
                                 Icon(Icons.Filled.Close, contentDescription = "세부항목 삭제")
                             }
                         }
-                        // Each 세부항목 carries its own deadline; the table sorts rows by it.
+                        // Each 세부항목 carries its own deadline; the main table sorts lines by it.
                         DateField(
-                            label = "세부항목 종료일",
+                            label = "세부항목 완료예정일",
                             epochMillis = subItem.endDate,
                             emptyLabel = "지정 안 됨",
                             onValueChange = { subItems[index] = subItem.copy(endDate = it) },
@@ -196,7 +196,7 @@ fun AddEditItemDialog(
                 // 종료일 is the date this is meant to be finished by, which is what 남은날짜 counts
                 // down to. Whether it's actually finished is the separate 완료 checkbox below.
                 DateField(
-                    label = "종료일 (목표)",
+                    label = "최종 종료일 (목표)",
                     epochMillis = endDate,
                     emptyLabel = "지정 안 됨 (탭하여 선택)",
                     onValueChange = { endDate = it },

@@ -31,9 +31,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.wishlist.app.data.SortField
 import com.wishlist.app.repository.TableRow
@@ -47,7 +49,7 @@ private object Col {
     val minor = 84.dp
     val title = 128.dp
     val subItem = 140.dp
-    val endDate = 96.dp
+    val endDate = 104.dp
     val remaining = 64.dp
     val priority = 44.dp
     val done = 44.dp
@@ -140,11 +142,11 @@ private fun HeaderRow(
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        HeaderCell("대분류", Col.major, SortField.MAJOR_CATEGORY, sortField, ascending, onSortSelected)
-        HeaderCell("중분류", Col.minor, SortField.MINOR_CATEGORY, sortField, ascending, onSortSelected)
+        // 대분류 and 중분류 sort as a single unit, so they share one header spanning both columns.
+        HeaderCell("대/중분류", Col.major + Col.minor, SortField.CATEGORY, sortField, ascending, onSortSelected)
         HeaderCell("할 일", Col.title, SortField.TITLE, sortField, ascending, onSortSelected)
         HeaderCell("세부항목", Col.subItem, SortField.SUB_ITEM, sortField, ascending, onSortSelected)
-        HeaderCell("종료일", Col.endDate, SortField.END_DATE, sortField, ascending, onSortSelected)
+        HeaderCell("완료예정일", Col.endDate, SortField.END_DATE, sortField, ascending, onSortSelected)
         HeaderCell("남은날짜", Col.remaining, null, sortField, ascending, onSortSelected)
         HeaderCell("순위", Col.priority, SortField.PRIORITY, sortField, ascending, onSortSelected)
         HeaderCell("완료", Col.done, null, sortField, ascending, onSortSelected)
@@ -155,7 +157,7 @@ private fun HeaderRow(
 @Composable
 private fun HeaderCell(
     label: String,
-    width: androidx.compose.ui.unit.Dp,
+    width: Dp,
     field: SortField?,
     activeField: SortField,
     ascending: Boolean,
@@ -193,15 +195,26 @@ private fun DataRow(
     onClick: () -> Unit,
 ) {
     val strike = if (row.isDone) TextDecoration.LineThrough else null
+    // An 항목 line reads as the head of its block; a 세부항목 line under it is indented and leaves the
+    // 항목 columns empty, so the two never look like the same kind of thing.
+    val isChild = row.grouped && !row.isItemRow
+    val weight = if (row.isItemRow && row.grouped) FontWeight.SemiBold else FontWeight.Normal
+    val background = if (row.isItemRow && row.grouped) {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    } else {
+        Color.Transparent
+    }
+
     Row(
-        modifier = Modifier.padding(vertical = 6.dp),
+        modifier = Modifier.background(background).padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Everything except the done checkbox opens the editor.
-        Cell(row.item.majorCategory.orEmpty(), Col.major, strike, onClick)
-        Cell(row.item.minorCategory.orEmpty(), Col.minor, strike, onClick)
-        Cell(row.item.title, Col.title, strike, onClick)
-        Cell(row.subItem?.title ?: "-", Col.subItem, strike, onClick)
+        // Everything except the done checkbox opens the editor, which always shows the whole 항목
+        // together with its 세부항목 — tapping a child line edits its parent.
+        Cell(if (isChild) "" else row.item.majorCategory.orEmpty(), Col.major, strike, onClick, weight = weight)
+        Cell(if (isChild) "" else row.item.minorCategory.orEmpty(), Col.minor, strike, onClick, weight = weight)
+        Cell(if (isChild) "" else row.item.title, Col.title, strike, onClick, weight = weight)
+        Cell(subItemLabel(row), Col.subItem, strike, onClick, indent = if (isChild) 14.dp else 0.dp)
         Cell(row.effectiveEndDate?.let { formatDate(it) } ?: "-", Col.endDate, strike, onClick)
         Cell(
             text = if (row.isDone) "완료" else formatRemainingDays(row.effectiveEndDate),
@@ -210,28 +223,45 @@ private fun DataRow(
             onClick = onClick,
             color = MaterialTheme.colorScheme.primary,
         )
-        Cell("${row.item.priority}", Col.priority, strike, onClick)
+        Cell(if (isChild) "" else "${row.item.priority}", Col.priority, strike, onClick)
         Box(modifier = Modifier.width(Col.done), contentAlignment = Alignment.Center) {
             Checkbox(checked = row.isDone, onCheckedChange = { onToggleDone() })
         }
     }
 }
 
+/**
+ * The 세부항목 column: a child line shows its own name, an 항목 line shows how many of its 세부항목
+ * are ticked off, and an item with no 세부항목 shows nothing to count.
+ */
+private fun subItemLabel(row: TableRow): String = when {
+    // The └ only makes sense when the parent 항목 is the line right above.
+    !row.isItemRow -> if (row.grouped) "└ ${row.subItem?.title.orEmpty()}" else row.subItem?.title.orEmpty()
+    row.item.subItems.isEmpty() -> "-"
+    else -> "${row.item.doneSubItemCount}/${row.item.subItems.size} 완료"
+}
+
 @Composable
 private fun Cell(
     text: String,
-    width: androidx.compose.ui.unit.Dp,
+    width: Dp,
     strike: TextDecoration?,
     onClick: () -> Unit,
-    color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
+    color: Color = MaterialTheme.colorScheme.onSurface,
+    weight: FontWeight = FontWeight.Normal,
+    indent: Dp = 0.dp,
 ) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodySmall,
         color = color,
+        fontWeight = weight,
         textDecoration = strike,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.width(width).clickable(onClick = onClick).padding(horizontal = 6.dp),
+        modifier = Modifier
+            .width(width)
+            .clickable(onClick = onClick)
+            .padding(start = 6.dp + indent, end = 6.dp),
     )
 }

@@ -176,6 +176,6 @@ private fun SortPreference.toJson(): JSONObject = JSONObject().apply {
 }
 
 private fun JSONObject.toSortPreference(): SortPreference = SortPreference(
-    sortField = runCatching { SortField.valueOf(getString("sortField")) }.getOrDefault(SortField.END_DATE),
+    sortField = SortField.fromStoredName(optString("sortField")),
     ascending = optBoolean("ascending", true),
 )
