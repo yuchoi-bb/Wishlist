@@ -29,6 +29,29 @@ fun formatDate(epochMillis: Long): String =
 fun formatDateTime(epochMillis: Long): String =
     Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(dateTimeFormatter)
 
+/**
+ * Local start-of-day of the last day of the month [monthsAhead] from today — the target date behind
+ * the 월말 shortcuts. Offset 0 is 이달, 1 is next month, and so on.
+ */
+fun endOfMonthMillis(monthsAhead: Int, now: Long = System.currentTimeMillis()): Long {
+    val zone = ZoneId.systemDefault()
+    val month = Instant.ofEpochMilli(now).atZone(zone).toLocalDate().plusMonths(monthsAhead.toLong())
+    return month.withDayOfMonth(month.lengthOfMonth()).atStartOfDay(zone).toInstant().toEpochMilli()
+}
+
+/**
+ * Label for a 월말 shortcut. "8월말" would be three characters wide in every chip, so a chip carries
+ * only the month number and the row is captioned 월말 once — 이달 for the current month.
+ */
+fun monthEndLabel(monthsAhead: Int, now: Long = System.currentTimeMillis()): String {
+    if (monthsAhead == 0) return "이달"
+    val zone = ZoneId.systemDefault()
+    return Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+        .plusMonths(monthsAhead.toLong())
+        .monthValue
+        .toString()
+}
+
 /** Countdown to a 종료일: "D-3" with days to go, "D-DAY" today, "D+2" once it's past. */
 fun formatRemainingDays(endDate: Long?, now: Long = System.currentTimeMillis()): String {
     if (endDate == null) return "-"

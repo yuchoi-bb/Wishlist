@@ -1,27 +1,32 @@
 package com.wishlist.app.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -43,9 +48,15 @@ import com.wishlist.app.data.SubItem
 import com.wishlist.app.data.WishlistItem
 import com.wishlist.app.ui.WishlistViewModel
 import com.wishlist.app.ui.components.DateField
+import com.wishlist.app.ui.components.MonthEndChips
 import com.wishlist.app.ui.theme.categoryColor
 import com.wishlist.app.util.todayStartOfDayMillis
 
+/**
+ * The 항목 editor, and the only place completion and deletion happen. Field order follows the way an
+ * item is actually filled in: 할 일 → 우선순위 → 최종 종료일 → 세부항목 → 분류 → 메모, with 시작일 and
+ * 완료 at the end where they're rarely touched.
+ */
 @Composable
 fun AddEditItemDialog(
     viewModel: WishlistViewModel,
@@ -94,14 +105,32 @@ fun AddEditItemDialog(
                 )
                 Spacer(Modifier.height(12.dp))
 
-                OutlinedTextField(
-                    value = memo,
-                    onValueChange = { memo = it },
-                    label = { Text("메모") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2,
-                    maxLines = 5,
+                Text("우선순위", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    WishlistItem.PRIORITIES.forEach { value ->
+                        FilterChip(
+                            selected = priority == value,
+                            onClick = { priority = value },
+                            label = { Text("$value") },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+
+                // 최종 종료일 is the date the whole item is meant to be finished by, which is what
+                // 남은날짜 counts down to. Whether it's actually finished is the 완료 checkbox below.
+                DateField(
+                    label = "최종 종료일 (목표일)",
+                    epochMillis = endDate,
+                    emptyLabel = "지정 안 됨 (탭하여 선택)",
+                    onValueChange = { endDate = it },
+                    trailingContent = {
+                        if (endDate != null) {
+                            TextButton(onClick = { endDate = null }) { Text("지우기") }
+                        }
+                    },
                 )
+                MonthEndChips(selected = endDate, onSelect = { endDate = it })
                 Spacer(Modifier.height(16.dp))
 
                 Text("세부항목", style = MaterialTheme.typography.titleSmall)
@@ -139,6 +168,10 @@ fun AddEditItemDialog(
                                 }
                             },
                         )
+                        MonthEndChips(
+                            selected = subItem.endDate,
+                            onSelect = { subItems[index] = subItem.copy(endDate = it) },
+                        )
                         Spacer(Modifier.height(8.dp))
                     }
                 }
@@ -156,6 +189,8 @@ fun AddEditItemDialog(
                     IconButton(
                         enabled = newSubItemTitle.isNotBlank(),
                         onClick = {
+                            // The new row appears with its own 월말 chips right above this field, so
+                            // the date can be set in one more tap.
                             subItems.add(SubItem(title = newSubItemTitle.trim()))
                             newSubItemTitle = ""
                         },
@@ -165,36 +200,39 @@ fun AddEditItemDialog(
                 }
                 Spacer(Modifier.height(16.dp))
 
-                OutlinedTextField(
-                    value = majorCategory,
-                    onValueChange = { majorCategory = it },
-                    label = { Text("대분류") },
+                // 대분류 | 중분류 on one line: both are free text, with everything already used
+                // available from the dropdown.
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-                if (majorCategorySuggestions.isNotEmpty()) {
-                    SuggestionRow(
-                        suggestions = majorCategorySuggestions,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    CategoryField(
+                        label = "대분류",
+                        value = majorCategory,
+                        options = majorCategorySuggestions,
                         colorFor = { categoryColor(it, null) },
-                        onSelect = { majorCategory = it },
+                        onValueChange = { majorCategory = it },
+                        modifier = Modifier.weight(1f),
+                    )
+                    CategoryField(
+                        label = "중분류",
+                        value = minorCategory,
+                        options = minorSuggestions,
+                        colorFor = { categoryColor(majorCategory, it) },
+                        onValueChange = { minorCategory = it },
+                        modifier = Modifier.weight(1f),
                     )
                 }
                 Spacer(Modifier.height(12.dp))
 
                 OutlinedTextField(
-                    value = minorCategory,
-                    onValueChange = { minorCategory = it },
-                    label = { Text("중분류") },
+                    value = memo,
+                    onValueChange = { memo = it },
+                    label = { Text("메모") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                    minLines = 2,
+                    maxLines = 5,
                 )
-                if (minorSuggestions.isNotEmpty()) {
-                    SuggestionRow(
-                        suggestions = minorSuggestions,
-                        colorFor = { categoryColor(majorCategory, it) },
-                        onSelect = { minorCategory = it },
-                    )
-                }
                 Spacer(Modifier.height(16.dp))
 
                 DateField(
@@ -202,38 +240,11 @@ fun AddEditItemDialog(
                     epochMillis = startedAt,
                     onValueChange = { startedAt = it },
                 )
-                Spacer(Modifier.height(16.dp))
-
-                // 종료일 is the date this is meant to be finished by, which is what 남은날짜 counts
-                // down to. Whether it's actually finished is the separate 완료 checkbox below.
-                DateField(
-                    label = "최종 종료일 (목표)",
-                    epochMillis = endDate,
-                    emptyLabel = "지정 안 됨 (탭하여 선택)",
-                    onValueChange = { endDate = it },
-                    trailingContent = {
-                        if (endDate != null) {
-                            TextButton(onClick = { endDate = null }) { Text("지우기") }
-                        }
-                    },
-                )
                 Spacer(Modifier.height(8.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = isDone, onCheckedChange = { isDone = it })
                     Text("완료")
-                }
-                Spacer(Modifier.height(12.dp))
-
-                Text("우선순위", style = MaterialTheme.typography.labelMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    WishlistItem.PRIORITIES.forEach { value ->
-                        FilterChip(
-                            selected = priority == value,
-                            onClick = { priority = value },
-                            label = { Text("$value") },
-                        )
-                    }
                 }
                 Spacer(Modifier.height(20.dp))
 
@@ -276,27 +287,60 @@ fun AddEditItemDialog(
 }
 
 /**
- * Existing categories to pick from, each chip carrying the same color the main table paints that
- * (대/중분류) with, so a category is recognizable here too.
+ * A 분류 field: type anything, or pick one of the values already in use from the dropdown. New
+ * categories still have to be typeable, so the text field stays editable rather than read-only.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SuggestionRow(
-    suggestions: List<String>,
+private fun CategoryField(
+    label: String,
+    value: String,
+    options: List<String>,
+    /** The color the main table paints this category with, shown as a dot next to each option. */
     colorFor: (String) -> Color?,
-    onSelect: (String) -> Unit,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        items(suggestions) { suggestion ->
-            val tint = colorFor(suggestion)
-            AssistChip(
-                onClick = { onSelect(suggestion) },
-                label = { Text(suggestion) },
-                colors = if (tint != null) {
-                    AssistChipDefaults.assistChipColors(containerColor = tint.copy(alpha = 0.25f))
-                } else {
-                    AssistChipDefaults.assistChipColors()
-                },
-            )
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = expanded && options.isNotEmpty(),
+        onExpandedChange = { expanded = it },
+        modifier = modifier,
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(label) },
+            singleLine = true,
+            trailingIcon = {
+                if (options.isNotEmpty()) {
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(MenuAnchorType.PrimaryEditable),
+        )
+        ExposedDropdownMenu(expanded = expanded && options.isNotEmpty(), onDismissRequest = { expanded = false }) {
+            options.forEach { option ->
+                val tint = colorFor(option)
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    leadingIcon = tint?.let {
+                        {
+                            Box(
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .background(it, CircleShape),
+                            )
+                        }
+                    },
+                    onClick = {
+                        onValueChange(option)
+                        expanded = false
+                    },
+                )
+            }
         }
     }
 }
