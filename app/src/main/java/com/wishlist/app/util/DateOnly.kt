@@ -55,7 +55,8 @@ fun monthEndLabel(monthsAhead: Int, now: Long = System.currentTimeMillis()): Str
         12 -> "C"
         else -> month.toString()
     }
-    return "$symbol말"
+    // Braces are required: Hangul is an identifier character, so "$symbol말" would parse as one name.
+    return "${symbol}말"
 }
 
 /** Countdown to a 종료일: "D-3" with days to go, "D-DAY" today, "D+2" once it's past. */

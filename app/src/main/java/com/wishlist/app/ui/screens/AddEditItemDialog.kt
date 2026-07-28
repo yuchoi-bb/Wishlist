@@ -91,7 +91,10 @@ fun AddEditItemDialog(
     val setItemEndDate: (Long?) -> Unit = { value ->
         endDate = value
         if (value != null) {
-            subItems.forEachIndexed { index, sub ->
+            // Indices rather than forEach: writing back into the list while iterating it would trip
+            // the snapshot list's concurrent-modification check.
+            for (index in subItems.indices) {
+                val sub = subItems[index]
                 if (sub.endDate == null) subItems[index] = sub.copy(endDate = value)
             }
         }
