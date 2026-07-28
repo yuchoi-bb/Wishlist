@@ -2,9 +2,11 @@ package com.wishlist.app.data
 
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.wishlist.app.util.toStartOfDayMillis
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
@@ -16,21 +18,30 @@ import kotlinx.coroutines.tasks.await
  */
 class FirestoreWishlistRepository(private val firestore: FirebaseFirestore) {
 
+    /**
+     * The last listener failure, or null while sync is healthy. A rejected listener used to be
+     * rethrown into the collecting coroutine, which took the whole app down — a security rule that
+     * hasn't been published yet is a reason to show a message, not to crash.
+     */
+    val syncError = MutableStateFlow<String?>(null)
+
     private fun itemsCollection(uid: String) =
         firestore.collection("users").document(uid).collection("wishlist_items")
 
     fun observeItems(uid: String): Flow<List<WishlistItem>> = callbackFlow {
         val registration = itemsCollection(uid).addSnapshotListener { snapshot, error ->
             if (error != null) {
-                close(error)
+                syncError.value = error.describe("할 일")
+                trySend(emptyList())
                 return@addSnapshotListener
             }
+            syncError.value = null
             trySend(snapshot?.documents.orEmpty().map { it.toWishlistItem() })
         }
         awaitClose { registration.remove() }
     }
 
-    suspend fun saveItem(uid: String, item: WishlistItem) {
+    suspend fun saveItem(uid: String, item: WishlistItem) = guarded("할 일") {
         val data = item.toFirestoreMap()
         if (item.id.isBlank()) {
             itemsCollection(uid).add(data).await()
@@ -39,9 +50,22 @@ class FirestoreWishlistRepository(private val firestore: FirebaseFirestore) {
         }
     }
 
-    suspend fun deleteItem(uid: String, item: WishlistItem) {
-        if (item.id.isBlank()) return
-        itemsCollection(uid).document(item.id).delete().await()
+    suspend fun deleteItem(uid: String, item: WishlistItem) = guarded("할 일") {
+        if (item.id.isNotBlank()) itemsCollection(uid).document(item.id).delete().await()
+    }
+
+    /**
+     * Runs a write and turns a rejection into [syncError] instead of an exception. Writes are
+     * launched from click handlers, where an uncaught failure would take the app down for something
+     * as recoverable as a rule that hasn't been published.
+     */
+    private suspend fun guarded(what: String, block: suspend () -> Unit) {
+        runCatching { block() }
+            .onSuccess { syncError.value = null }
+            .onFailure { failure ->
+                syncError.value = (failure as? FirebaseFirestoreException)?.describe(what)
+                    ?: "$what 저장 실패: ${failure.message}"
+            }
     }
 
     suspend fun getAllItemsOnce(uid: String): List<WishlistItem> =
@@ -55,7 +79,10 @@ class FirestoreWishlistRepository(private val firestore: FirebaseFirestore) {
     fun observeCategoryColors(uid: String): Flow<List<CategoryColorPref>> = callbackFlow {
         val registration = categoryColorsDoc(uid).addSnapshotListener { snapshot, error ->
             if (error != null) {
-                close(error)
+                // Colors are decoration: without them the automatic ones still work, so the rest of
+                // the app carries on and only the banner mentions it.
+                syncError.value = error.describe("분류 색")
+                trySend(emptyList())
                 return@addSnapshotListener
             }
             trySend(snapshot.readCategoryColors())
@@ -63,7 +90,7 @@ class FirestoreWishlistRepository(private val firestore: FirebaseFirestore) {
         awaitClose { registration.remove() }
     }
 
-    suspend fun saveCategoryColors(uid: String, prefs: List<CategoryColorPref>) {
+    suspend fun saveCategoryColors(uid: String, prefs: List<CategoryColorPref>) = guarded("분류 색") {
         val entries = prefs.map {
             mapOf("major" to it.major, "minor" to it.minor, "paletteIndex" to it.paletteIndex)
         }
@@ -72,6 +99,18 @@ class FirestoreWishlistRepository(private val firestore: FirebaseFirestore) {
 
     suspend fun getCategoryColorsOnce(uid: String): List<CategoryColorPref> =
         categoryColorsDoc(uid).get().await().readCategoryColors()
+}
+
+/**
+ * A short Korean explanation of a listener failure. PERMISSION_DENIED is the one worth naming: it
+ * means the Firestore security rules don't cover this path yet, which no amount of retrying fixes.
+ */
+private fun FirebaseFirestoreException.describe(what: String): String = when (code) {
+    FirebaseFirestoreException.Code.PERMISSION_DENIED ->
+        "$what 동기화 권한이 없습니다. Firebase 콘솔에서 Firestore 규칙을 게시했는지 확인해주세요."
+    FirebaseFirestoreException.Code.UNAVAILABLE ->
+        "$what 동기화 연결이 끊겼습니다. 네트워크가 돌아오면 자동으로 다시 붙습니다."
+    else -> "$what 동기화 오류: ${code.name}"
 }
 
 @Suppress("UNCHECKED_CAST")

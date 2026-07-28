@@ -48,7 +48,8 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
                     repository.observeSortPreference(),
                     showCompleted,
                     repository.observeCategoryColors(uid),
-                ) { rows, preference, includeCompleted, colors ->
+                    repository.observeSyncError(),
+                ) { rows, preference, includeCompleted, colors, syncError ->
                     WishlistUiState(
                         rows = rows,
                         sortField = preference.sortField,
@@ -56,6 +57,7 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
                         showCompleted = includeCompleted,
                         majorCategories = rows.mapNotNull { it.item.majorCategory }.distinct().sorted(),
                         categoryColors = colors,
+                        syncError = syncError,
                         isLoading = false,
                     )
                 }

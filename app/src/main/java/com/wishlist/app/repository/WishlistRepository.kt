@@ -39,6 +39,10 @@ class WishlistRepository(
         firestoreRepository?.saveItem(uid, item.copy(subItems = subItems))
     }
 
+    /** Whatever is currently wrong with Firestore sync, or null while it's healthy. */
+    fun observeSyncError(): Flow<String?> =
+        firestoreRepository?.syncError ?: flowOf(null)
+
     fun observeCategoryColors(uid: String): Flow<List<CategoryColorPref>> =
         firestoreRepository?.observeCategoryColors(uid) ?: flowOf(emptyList())
 

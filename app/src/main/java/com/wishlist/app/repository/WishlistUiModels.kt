@@ -44,5 +44,7 @@ data class WishlistUiState(
     val majorCategories: List<String> = emptyList(),
     /** Colors the user picked per 대분류/중분류; anything not listed falls back to an automatic one. */
     val categoryColors: List<CategoryColorPref> = emptyList(),
+    /** Set while Firestore sync is failing — shown as a banner rather than taken as fatal. */
+    val syncError: String? = null,
     val isLoading: Boolean = true,
 )
