@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -34,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -41,6 +43,7 @@ import com.wishlist.app.data.SubItem
 import com.wishlist.app.data.WishlistItem
 import com.wishlist.app.ui.WishlistViewModel
 import com.wishlist.app.ui.components.DateField
+import com.wishlist.app.ui.theme.categoryColor
 import com.wishlist.app.util.todayStartOfDayMillis
 
 @Composable
@@ -170,7 +173,11 @@ fun AddEditItemDialog(
                     singleLine = true,
                 )
                 if (majorCategorySuggestions.isNotEmpty()) {
-                    SuggestionRow(majorCategorySuggestions) { majorCategory = it }
+                    SuggestionRow(
+                        suggestions = majorCategorySuggestions,
+                        colorFor = { categoryColor(it, null) },
+                        onSelect = { majorCategory = it },
+                    )
                 }
                 Spacer(Modifier.height(12.dp))
 
@@ -182,7 +189,11 @@ fun AddEditItemDialog(
                     singleLine = true,
                 )
                 if (minorSuggestions.isNotEmpty()) {
-                    SuggestionRow(minorSuggestions) { minorCategory = it }
+                    SuggestionRow(
+                        suggestions = minorSuggestions,
+                        colorFor = { categoryColor(majorCategory, it) },
+                        onSelect = { minorCategory = it },
+                    )
                 }
                 Spacer(Modifier.height(16.dp))
 
@@ -264,11 +275,28 @@ fun AddEditItemDialog(
     }
 }
 
+/**
+ * Existing categories to pick from, each chip carrying the same color the main table paints that
+ * (대/중분류) with, so a category is recognizable here too.
+ */
 @Composable
-private fun SuggestionRow(suggestions: List<String>, onSelect: (String) -> Unit) {
+private fun SuggestionRow(
+    suggestions: List<String>,
+    colorFor: (String) -> Color?,
+    onSelect: (String) -> Unit,
+) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         items(suggestions) { suggestion ->
-            AssistChip(onClick = { onSelect(suggestion) }, label = { Text(suggestion) })
+            val tint = colorFor(suggestion)
+            AssistChip(
+                onClick = { onSelect(suggestion) },
+                label = { Text(suggestion) },
+                colors = if (tint != null) {
+                    AssistChipDefaults.assistChipColors(containerColor = tint.copy(alpha = 0.25f))
+                } else {
+                    AssistChipDefaults.assistChipColors()
+                },
+            )
         }
     }
 }

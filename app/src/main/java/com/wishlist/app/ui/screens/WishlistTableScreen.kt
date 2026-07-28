@@ -6,8 +6,11 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -40,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import com.wishlist.app.data.SortField
 import com.wishlist.app.repository.TableRow
 import com.wishlist.app.repository.WishlistUiState
+import com.wishlist.app.ui.theme.categoryColor
 import com.wishlist.app.util.formatDate
 import com.wishlist.app.util.formatRemainingDays
 
@@ -198,21 +202,48 @@ private fun DataRow(
     // An 항목 line reads as the head of its block; a 세부항목 line under it is indented and leaves the
     // 항목 columns empty, so the two never look like the same kind of thing.
     val isChild = row.grouped && !row.isItemRow
-    val weight = if (row.isItemRow && row.grouped) FontWeight.SemiBold else FontWeight.Normal
-    val background = if (row.isItemRow && row.grouped) {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-    } else {
-        Color.Transparent
+    val isBlockHead = row.isItemRow && row.grouped
+    val weight = if (isBlockHead) FontWeight.SemiBold else FontWeight.Normal
+
+    // Every line of a (대/중분류) is tinted with that category's color, so the same category is
+    // recognizable wherever the sort puts it. Alpha keeps the text readable in both themes.
+    val tint = categoryColor(row.item.majorCategory, row.item.minorCategory)
+    val background = when {
+        tint != null -> tint.copy(alpha = if (isBlockHead) 0.24f else 0.12f)
+        isBlockHead -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+        else -> Color.Transparent
     }
+    // The 대분류/중분류 columns themselves get the stronger tint, so the color reads as a band down
+    // the left of the table rather than a wash over every row.
+    val categoryCellBackground = tint?.copy(alpha = 0.4f) ?: Color.Transparent
 
     Row(
-        modifier = Modifier.background(background).padding(vertical = 6.dp),
+        // IntrinsicSize.Min gives the row a bounded height inside the LazyColumn, which is what lets
+        // the tinted category cells fill it instead of collapsing to the height of their text.
+        modifier = Modifier
+            .height(IntrinsicSize.Min)
+            .background(background)
+            .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Everything except the done checkbox opens the editor, which always shows the whole 항목
         // together with its 세부항목 — tapping a child line edits its parent.
-        Cell(if (isChild) "" else row.item.majorCategory.orEmpty(), Col.major, strike, onClick, weight = weight)
-        Cell(if (isChild) "" else row.item.minorCategory.orEmpty(), Col.minor, strike, onClick, weight = weight)
+        Cell(
+            text = if (isChild) "" else row.item.majorCategory.orEmpty(),
+            width = Col.major,
+            strike = strike,
+            onClick = onClick,
+            weight = weight,
+            background = categoryCellBackground,
+        )
+        Cell(
+            text = if (isChild) "" else row.item.minorCategory.orEmpty(),
+            width = Col.minor,
+            strike = strike,
+            onClick = onClick,
+            weight = weight,
+            background = categoryCellBackground,
+        )
         Cell(if (isChild) "" else row.item.title, Col.title, strike, onClick, weight = weight)
         Cell(subItemLabel(row), Col.subItem, strike, onClick, indent = if (isChild) 14.dp else 0.dp)
         Cell(row.effectiveEndDate?.let { formatDate(it) } ?: "-", Col.endDate, strike, onClick)
@@ -250,18 +281,25 @@ private fun Cell(
     color: Color = MaterialTheme.colorScheme.onSurface,
     weight: FontWeight = FontWeight.Normal,
     indent: Dp = 0.dp,
+    background: Color = Color.Transparent,
 ) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodySmall,
-        color = color,
-        fontWeight = weight,
-        textDecoration = strike,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
+    Box(
         modifier = Modifier
             .width(width)
+            .fillMaxHeight()
+            .background(background)
             .clickable(onClick = onClick)
             .padding(start = 6.dp + indent, end = 6.dp),
-    )
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = color,
+            fontWeight = weight,
+            textDecoration = strike,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
