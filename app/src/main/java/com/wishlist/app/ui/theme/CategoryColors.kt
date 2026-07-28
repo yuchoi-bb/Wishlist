@@ -2,17 +2,14 @@ package com.wishlist.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import com.wishlist.app.data.CategoryColorPref
 import kotlin.math.absoluteValue
 
 /**
- * Colors that identify a (대/중분류) at a glance in the main table.
- *
- * The hue comes from 대분류 alone, so everything in one 대분류 is visibly related; 중분류 only shifts
- * that hue lighter or darker, so sibling 중분류 stay distinguishable without looking unrelated. The
- * mapping is derived from the name itself rather than stored, so the same category keeps its color
- * on every device and across reinstalls without anything to sync.
+ * The colors a (대/중분류) can take in the main table. Chosen to stay legible as a background tint
+ * in both light and dark themes; prefs store an index into this list rather than a raw color.
  */
-private val palette = listOf(
+val CATEGORY_PALETTE: List<Color> = listOf(
     Color(0xFF4F7CFF), // blue
     Color(0xFF2FA37A), // green
     Color(0xFFE0693E), // orange
@@ -23,13 +20,30 @@ private val palette = listOf(
     Color(0xFF5E6E8C), // slate
 )
 
-/** Null when there's no 대분류 to color by, so the row keeps the plain surface. */
-fun categoryColor(major: String?, minor: String?): Color? {
+/**
+ * The color identifying a (대/중분류), or null when there's no 대분류 to color by.
+ *
+ * A user-picked color in [prefs] wins: one set on the 중분류 is used exactly, one set on the 대분류
+ * colors the whole 대분류. Anything not picked falls back to a color derived from the name itself —
+ * the hue from 대분류, shaded lighter or darker by 중분류 — so categories are distinguishable from
+ * the moment they're created, with nothing to configure and nothing to sync.
+ */
+fun categoryColor(
+    major: String?,
+    minor: String?,
+    prefs: List<CategoryColorPref> = emptyList(),
+): Color? {
     val majorKey = major?.takeIf { it.isNotBlank() } ?: return null
-    val base = palette[majorKey.hashCode().absoluteValue % palette.size]
-    val minorKey = minor?.takeIf { it.isNotBlank() } ?: return base
-    // -0.24..+0.24 — five steps of shade per 대분류, enough to tell 중분류 apart while staying in
-    // the same family.
+    val minorKey = minor?.takeIf { it.isNotBlank() }
+
+    if (minorKey != null) {
+        prefs.paletteColor(majorKey, minorKey)?.let { return it }
+    }
+    val base = prefs.paletteColor(majorKey, null)
+        ?: CATEGORY_PALETTE[majorKey.hashCode().absoluteValue % CATEGORY_PALETTE.size]
+    if (minorKey == null) return base
+
+    // -0.24..+0.24 — five steps of shade, enough to tell 중분류 apart while keeping the 대분류 family.
     val shift = ((minorKey.hashCode().absoluteValue % 5) - 2) * 0.12f
     return when {
         shift > 0f -> lerp(base, Color.White, shift)
@@ -37,3 +51,10 @@ fun categoryColor(major: String?, minor: String?): Color? {
         else -> base
     }
 }
+
+/** The palette index the user picked for this exact category, or null if they haven't. */
+fun List<CategoryColorPref>.paletteIndexFor(major: String, minor: String?): Int? =
+    firstOrNull { it.major == major && it.minor == minor }?.paletteIndex
+
+private fun List<CategoryColorPref>.paletteColor(major: String, minor: String?): Color? =
+    paletteIndexFor(major, minor)?.let { CATEGORY_PALETTE[it.mod(CATEGORY_PALETTE.size)] }

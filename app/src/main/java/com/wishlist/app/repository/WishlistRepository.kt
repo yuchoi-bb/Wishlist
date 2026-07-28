@@ -1,5 +1,6 @@
 package com.wishlist.app.repository
 
+import com.wishlist.app.data.CategoryColorPref
 import com.wishlist.app.data.FirestoreWishlistRepository
 import com.wishlist.app.data.SortField
 import com.wishlist.app.data.SortPreference
@@ -36,6 +37,13 @@ class WishlistRepository(
 
     suspend fun updateSubItems(uid: String, item: WishlistItem, subItems: List<SubItem>) {
         firestoreRepository?.saveItem(uid, item.copy(subItems = subItems))
+    }
+
+    fun observeCategoryColors(uid: String): Flow<List<CategoryColorPref>> =
+        firestoreRepository?.observeCategoryColors(uid) ?: flowOf(emptyList())
+
+    suspend fun saveCategoryColors(uid: String, prefs: List<CategoryColorPref>) {
+        firestoreRepository?.saveCategoryColors(uid, prefs)
     }
 
     fun observeSortPreference(): Flow<SortPreference> =

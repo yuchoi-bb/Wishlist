@@ -10,6 +10,7 @@ import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
 import com.google.api.services.drive.model.File as DriveFile
+import com.wishlist.app.data.CategoryColorPref
 import com.wishlist.app.data.FirestoreWishlistRepository
 import com.wishlist.app.data.SortField
 import com.wishlist.app.data.SortPreference
@@ -95,9 +96,11 @@ class DriveBackupManager(
     private suspend fun exportJson(uid: String): String {
         val items = firestoreRepository.getAllItemsOnce(uid)
         val sort = database.sortPreferenceDao().observe().first() ?: SortPreference()
+        val colors = firestoreRepository.getCategoryColorsOnce(uid)
         return JSONObject().apply {
             put("items", JSONArray(items.map { it.toJson() }))
             put("sort", sort.toJson())
+            put("categoryColors", JSONArray(colors.map { it.toJson() }))
         }.toString()
     }
 
@@ -110,6 +113,10 @@ class DriveBackupManager(
         // Older backups carried a "prefs" array of per-category sorts, which no longer exists now
         // that one sort applies to the whole table; those are simply skipped.
         root.optJSONObject("sort")?.let { database.sortPreferenceDao().upsert(it.toSortPreference()) }
+        root.optJSONArray("categoryColors")?.let { array ->
+            val colors = (0 until array.length()).map { array.getJSONObject(it).toCategoryColorPref() }
+            firestoreRepository.saveCategoryColors(uid, colors)
+        }
     }
 
     companion object {
@@ -168,6 +175,18 @@ private fun JSONObject.toWishlistItem(): WishlistItem = WishlistItem(
     isDone = if (has("isDone")) optBoolean("isDone") else has("completedAt") && !isNull("completedAt"),
     priority = optInt("priority", WishlistItem.DEFAULT_PRIORITY),
     position = optLong("position", 0L),
+)
+
+private fun CategoryColorPref.toJson(): JSONObject = JSONObject().apply {
+    put("major", major)
+    put("minor", minor)
+    put("paletteIndex", paletteIndex)
+}
+
+private fun JSONObject.toCategoryColorPref(): CategoryColorPref = CategoryColorPref(
+    major = optString("major"),
+    minor = if (isNull("minor")) null else optString("minor"),
+    paletteIndex = optInt("paletteIndex", 0),
 )
 
 private fun SortPreference.toJson(): JSONObject = JSONObject().apply {

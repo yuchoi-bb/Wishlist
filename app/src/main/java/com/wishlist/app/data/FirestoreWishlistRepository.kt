@@ -46,6 +46,45 @@ class FirestoreWishlistRepository(private val firestore: FirebaseFirestore) {
 
     suspend fun getAllItemsOnce(uid: String): List<WishlistItem> =
         itemsCollection(uid).get().await().documents.map { it.toWishlistItem() }
+
+    // Category colors live in a single document rather than one per category: the whole set is
+    // small, always read together, and rewritten as a unit whenever one color changes.
+    private fun categoryColorsDoc(uid: String) =
+        firestore.collection("users").document(uid).collection("settings").document("categoryColors")
+
+    fun observeCategoryColors(uid: String): Flow<List<CategoryColorPref>> = callbackFlow {
+        val registration = categoryColorsDoc(uid).addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
+            trySend(snapshot.readCategoryColors())
+        }
+        awaitClose { registration.remove() }
+    }
+
+    suspend fun saveCategoryColors(uid: String, prefs: List<CategoryColorPref>) {
+        val entries = prefs.map {
+            mapOf("major" to it.major, "minor" to it.minor, "paletteIndex" to it.paletteIndex)
+        }
+        categoryColorsDoc(uid).set(mapOf("entries" to entries)).await()
+    }
+
+    suspend fun getCategoryColorsOnce(uid: String): List<CategoryColorPref> =
+        categoryColorsDoc(uid).get().await().readCategoryColors()
+}
+
+@Suppress("UNCHECKED_CAST")
+private fun DocumentSnapshot?.readCategoryColors(): List<CategoryColorPref> {
+    val raw = this?.get("entries") as? List<Map<String, Any?>> ?: return emptyList()
+    return raw.mapNotNull { entry ->
+        val major = entry["major"] as? String ?: return@mapNotNull null
+        CategoryColorPref(
+            major = major,
+            minor = entry["minor"] as? String,
+            paletteIndex = (entry["paletteIndex"] as? Number)?.toInt() ?: 0,
+        )
+    }
 }
 
 private fun DocumentSnapshot.toWishlistItem(): WishlistItem {

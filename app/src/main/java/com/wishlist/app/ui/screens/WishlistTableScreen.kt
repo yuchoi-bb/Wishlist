@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.wishlist.app.data.CategoryColorPref
 import com.wishlist.app.data.SortField
 import com.wishlist.app.repository.TableRow
 import com.wishlist.app.repository.WishlistUiState
@@ -128,6 +129,7 @@ fun WishlistTableScreen(
                         items(uiState.rows, key = { it.rowKey }) { row ->
                             DataRow(
                                 row = row,
+                                categoryColors = uiState.categoryColors,
                                 onToggleDone = { onToggleRowDone(row) },
                                 onClick = { onRowClick(row) },
                             )
@@ -201,6 +203,7 @@ private fun HeaderCell(
 @Composable
 private fun DataRow(
     row: TableRow,
+    categoryColors: List<CategoryColorPref>,
     onToggleDone: () -> Unit,
     onClick: () -> Unit,
 ) {
@@ -213,7 +216,7 @@ private fun DataRow(
 
     // Every line of a (대/중분류) is tinted with that category's color, so the same category is
     // recognizable wherever the sort puts it. Alpha keeps the text readable in both themes.
-    val tint = categoryColor(row.item.majorCategory, row.item.minorCategory)
+    val tint = categoryColor(row.item.majorCategory, row.item.minorCategory, categoryColors)
     val background = when {
         tint != null -> tint.copy(alpha = if (isBlockHead) 0.24f else 0.12f)
         isBlockHead -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)

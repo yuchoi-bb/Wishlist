@@ -1,5 +1,6 @@
 package com.wishlist.app.repository
 
+import com.wishlist.app.data.CategoryColorPref
 import com.wishlist.app.data.SortField
 import com.wishlist.app.data.SubItem
 import com.wishlist.app.data.WishlistItem
@@ -41,5 +42,7 @@ data class WishlistUiState(
     /** Completed rows stay in the table but are hidden until the user asks to see them. */
     val showCompleted: Boolean = false,
     val majorCategories: List<String> = emptyList(),
+    /** Colors the user picked per 대분류/중분류; anything not listed falls back to an automatic one. */
+    val categoryColors: List<CategoryColorPref> = emptyList(),
     val isLoading: Boolean = true,
 )

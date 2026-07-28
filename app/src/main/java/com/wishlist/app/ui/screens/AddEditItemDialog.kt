@@ -1,6 +1,9 @@
 package com.wishlist.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,12 +47,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.wishlist.app.data.CategoryColorPref
 import com.wishlist.app.data.SubItem
 import com.wishlist.app.data.WishlistItem
 import com.wishlist.app.ui.WishlistViewModel
 import com.wishlist.app.ui.components.DateField
 import com.wishlist.app.ui.components.MonthEndChips
+import com.wishlist.app.ui.theme.CATEGORY_PALETTE
 import com.wishlist.app.ui.theme.categoryColor
+import com.wishlist.app.ui.theme.paletteIndexFor
 import com.wishlist.app.util.todayStartOfDayMillis
 
 /**
@@ -61,6 +67,7 @@ import com.wishlist.app.util.todayStartOfDayMillis
 fun AddEditItemDialog(
     viewModel: WishlistViewModel,
     majorCategorySuggestions: List<String>,
+    categoryColors: List<CategoryColorPref>,
     editingItem: WishlistItem?,
     onDismiss: () -> Unit,
     onSave: (WishlistItem) -> Unit,
@@ -233,7 +240,7 @@ fun AddEditItemDialog(
                         label = "대분류",
                         value = majorCategory,
                         options = majorCategorySuggestions,
-                        colorFor = { categoryColor(it, null) },
+                        colorFor = { categoryColor(it, null, categoryColors) },
                         onValueChange = { majorCategory = it },
                         modifier = Modifier.weight(1f),
                     )
@@ -241,9 +248,32 @@ fun AddEditItemDialog(
                         label = "중분류",
                         value = minorCategory,
                         options = minorSuggestions,
-                        colorFor = { categoryColor(majorCategory, it) },
+                        colorFor = { categoryColor(majorCategory, it, categoryColors) },
                         onValueChange = { minorCategory = it },
                         modifier = Modifier.weight(1f),
+                    )
+                }
+
+                // Colors belong to the category, not to this item, so they're applied the moment
+                // they're tapped rather than waiting for 저장 — the same 대분류 in every other item
+                // changes with it.
+                if (majorCategory.isNotBlank()) {
+                    ColorPickerRow(
+                        label = "대분류 색",
+                        selectedIndex = categoryColors.paletteIndexFor(majorCategory.trim(), null),
+                        onSelect = { viewModel.setCategoryColor(majorCategory.trim(), null, it) },
+                    )
+                }
+                if (majorCategory.isNotBlank() && minorCategory.isNotBlank()) {
+                    ColorPickerRow(
+                        label = "중분류 색",
+                        selectedIndex = categoryColors.paletteIndexFor(
+                            majorCategory.trim(),
+                            minorCategory.trim(),
+                        ),
+                        onSelect = {
+                            viewModel.setCategoryColor(majorCategory.trim(), minorCategory.trim(), it)
+                        },
                     )
                 }
                 Spacer(Modifier.height(12.dp))
@@ -305,6 +335,52 @@ fun AddEditItemDialog(
                     ) { Text("저장") }
                 }
             }
+        }
+    }
+}
+
+/**
+ * The palette, plus 자동 to go back to the color derived from the name. Scrolls sideways so it
+ * doesn't force the dialog wider on a small phone.
+ */
+@Composable
+private fun ColorPickerRow(
+    label: String,
+    selectedIndex: Int?,
+    onSelect: (Int?) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(top = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelMedium)
+        CATEGORY_PALETTE.forEachIndexed { index, color ->
+            val selected = selectedIndex == index
+            Box(
+                modifier = Modifier
+                    .size(if (selected) 26.dp else 22.dp)
+                    .background(color, CircleShape)
+                    .border(
+                        width = if (selected) 2.dp else 0.dp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        shape = CircleShape,
+                    )
+                    .clickable { onSelect(index) },
+            )
+        }
+        TextButton(onClick = { onSelect(null) }) {
+            Text(
+                text = "자동",
+                style = if (selectedIndex == null) {
+                    MaterialTheme.typography.labelLarge
+                } else {
+                    MaterialTheme.typography.labelMedium
+                },
+            )
         }
     }
 }

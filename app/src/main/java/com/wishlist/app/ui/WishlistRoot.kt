@@ -58,6 +58,7 @@ fun WishlistRoot(viewModel: WishlistViewModel = viewModel()) {
         AddEditItemDialog(
             viewModel = viewModel,
             majorCategorySuggestions = uiState.majorCategories,
+            categoryColors = uiState.categoryColors,
             editingItem = editingItem,
             onDismiss = { showAddEdit = false },
             onSave = { item ->

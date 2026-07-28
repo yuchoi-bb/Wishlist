@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.FirebaseFirestore
 import com.wishlist.app.auth.AuthManager
+import com.wishlist.app.data.CategoryColorPref
 import com.wishlist.app.data.FirestoreWishlistRepository
 import com.wishlist.app.data.SortField
 import com.wishlist.app.data.WishlistDatabase
@@ -46,13 +47,15 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
                     repository.observeRows(uid, showCompleted),
                     repository.observeSortPreference(),
                     showCompleted,
-                ) { rows, preference, includeCompleted ->
+                    repository.observeCategoryColors(uid),
+                ) { rows, preference, includeCompleted, colors ->
                     WishlistUiState(
                         rows = rows,
                         sortField = preference.sortField,
                         ascending = preference.ascending,
                         showCompleted = includeCompleted,
                         majorCategories = rows.mapNotNull { it.item.majorCategory }.distinct().sorted(),
+                        categoryColors = colors,
                         isLoading = false,
                     )
                 }
@@ -71,6 +74,22 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
             val ascending = if (current.sortField == field) !current.ascending else true
             repository.setSort(field, ascending)
         }
+    }
+
+    /**
+     * Sets the color for one 대분류 (minor null) or one 중분류 inside it. A null [paletteIndex] drops
+     * the pref, putting that category back on its automatic color.
+     */
+    fun setCategoryColor(major: String, minor: String?, paletteIndex: Int?) {
+        val uid = authManager.currentUser.value?.uid ?: return
+        if (major.isBlank()) return
+        val others = uiState.value.categoryColors.filterNot { it.major == major && it.minor == minor }
+        val updated = if (paletteIndex == null) {
+            others
+        } else {
+            others + CategoryColorPref(major = major, minor = minor, paletteIndex = paletteIndex)
+        }
+        viewModelScope.launch { repository.saveCategoryColors(uid, updated) }
     }
 
     fun observeMinorCategories(major: String): Flow<List<String>> {
