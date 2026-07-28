@@ -72,11 +72,22 @@ class DriveBackupManager(
             .build()
     }
 
+    /**
+     * When the backup on Drive was last written, or null if there isn't one yet. Read from the
+     * file itself rather than a local note, so it stays truthful even when the backup was made
+     * from a different device.
+     */
+    suspend fun lastBackupAt(account: GoogleSignInAccount): Result<Long?> = withContext(Dispatchers.IO) {
+        runCatching {
+            findBackupFile(driveService(account))?.modifiedTime?.value
+        }
+    }
+
     private fun findBackupFile(drive: Drive): DriveFile? {
         val result = drive.files().list()
             .setSpaces("appDataFolder")
             .setQ("name = '$BACKUP_FILE_NAME'")
-            .setFields("files(id, name)")
+            .setFields("files(id, name, modifiedTime)")
             .execute()
         return result.files?.firstOrNull()
     }
@@ -152,10 +163,12 @@ private fun CategorySortPref.toJson(): JSONObject = JSONObject().apply {
     put("categoryKey", categoryKey)
     put("sortField", sortField.name)
     put("ascending", ascending)
+    put("groupPosition", groupPosition)
 }
 
 private fun JSONObject.toCategorySortPref(): CategorySortPref = CategorySortPref(
     categoryKey = getString("categoryKey"),
     sortField = runCatching { SortField.valueOf(getString("sortField")) }.getOrDefault(SortField.COMPLETED_AT),
     ascending = getBoolean("ascending"),
+    groupPosition = optLong("groupPosition", CategorySortPref.UNSET_GROUP_POSITION),
 )

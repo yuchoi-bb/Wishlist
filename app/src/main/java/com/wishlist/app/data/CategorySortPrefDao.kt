@@ -11,6 +11,9 @@ interface CategorySortPrefDao {
     @Query("SELECT * FROM category_sort_prefs")
     fun observeAll(): Flow<List<CategorySortPref>>
 
+    @Query("SELECT * FROM category_sort_prefs WHERE categoryKey = :categoryKey")
+    suspend fun get(categoryKey: String): CategorySortPref?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(pref: CategorySortPref)
 }

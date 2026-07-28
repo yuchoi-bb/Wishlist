@@ -1,17 +1,21 @@
 package com.wishlist.app.ui.screens
 
+import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -22,12 +26,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -41,6 +47,7 @@ import com.wishlist.app.backup.DriveBackupManager
 import com.wishlist.app.data.FirestoreWishlistRepository
 import com.wishlist.app.data.WishlistDatabase
 import com.wishlist.app.update.UpdateChecker
+import com.wishlist.app.util.formatDateTime
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,6 +64,17 @@ fun SettingsScreen(authManager: AuthManager, onBack: () -> Unit) {
     var driveReauthTrigger by remember { mutableIntStateOf(0) }
     val account = remember(driveReauthTrigger) { backupManager.signedInAccount() }
     var statusMessage by remember { mutableStateOf<String?>(null) }
+
+    var busyLabel by remember { mutableStateOf<String?>(null) }
+    var lastBackupAt by remember { mutableStateOf<Long?>(null) }
+    var lastRestoreAt by remember { mutableStateOf(backupPrefs(context).getLong(KEY_LAST_RESTORE, 0L).takeIf { it > 0 }) }
+    // Bumped after a backup so the "마지막 백업" line refetches instead of showing a stale time.
+    var backupInfoTrigger by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(account, backupInfoTrigger) {
+        val currentAccount = account ?: return@LaunchedEffect
+        lastBackupAt = backupManager.lastBackupAt(currentAccount).getOrNull()
+    }
 
     val driveSignInLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         driveReauthTrigger++
@@ -105,6 +123,15 @@ fun SettingsScreen(authManager: AuthManager, onBack: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
             )
 
+            Text(
+                text = "마지막 백업: " + (lastBackupAt?.let { formatDateTime(it) } ?: "없음"),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                text = "마지막 복원: " + (lastRestoreAt?.let { formatDateTime(it) } ?: "없음"),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+
             val uid = currentUser?.uid
             if (account == null || uid == null) {
                 Text("Drive 접근 권한이 없습니다.", style = MaterialTheme.typography.bodySmall)
@@ -112,28 +139,56 @@ fun SettingsScreen(authManager: AuthManager, onBack: () -> Unit) {
                     Text("Drive 접근 허용")
                 }
             } else {
-                Button(onClick = {
-                    scope.launch {
-                        val result = backupManager.backup(account, uid)
-                        statusMessage = if (result.isSuccess) {
-                            "백업이 완료되었습니다"
-                        } else {
-                            describeDriveFailure("백업", result.exceptionOrNull())
-                        }
+                // Both actions take a few seconds against Drive with no other visible sign that
+                // anything happened, so show what's running and block a second tap meanwhile.
+                busyLabel?.let { label ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Text(label, style = MaterialTheme.typography.bodyMedium)
                     }
-                }) {
+                }
+
+                Button(
+                    enabled = busyLabel == null,
+                    onClick = {
+                        scope.launch {
+                            busyLabel = "백업 중…"
+                            statusMessage = null
+                            val result = backupManager.backup(account, uid)
+                            busyLabel = null
+                            statusMessage = if (result.isSuccess) {
+                                backupInfoTrigger++
+                                "백업이 완료되었습니다"
+                            } else {
+                                describeDriveFailure("백업", result.exceptionOrNull())
+                            }
+                        }
+                    },
+                ) {
                     Text("지금 백업하기")
                 }
-                OutlinedButton(onClick = {
-                    scope.launch {
-                        val result = backupManager.restore(account, uid)
-                        statusMessage = if (result.isSuccess) {
-                            "복원이 완료되었습니다"
-                        } else {
-                            describeDriveFailure("복원", result.exceptionOrNull())
+                OutlinedButton(
+                    enabled = busyLabel == null,
+                    onClick = {
+                        scope.launch {
+                            busyLabel = "복원 중…"
+                            statusMessage = null
+                            val result = backupManager.restore(account, uid)
+                            busyLabel = null
+                            statusMessage = if (result.isSuccess) {
+                                val now = System.currentTimeMillis()
+                                backupPrefs(context).edit().putLong(KEY_LAST_RESTORE, now).apply()
+                                lastRestoreAt = now
+                                "복원이 완료되었습니다"
+                            } else {
+                                describeDriveFailure("복원", result.exceptionOrNull())
+                            }
                         }
-                    }
-                }) {
+                    },
+                ) {
                     Text("백업에서 복원하기")
                 }
             }
@@ -170,6 +225,13 @@ fun SettingsScreen(authManager: AuthManager, onBack: () -> Unit) {
  * it — a 403 here is almost always the Drive API simply not being enabled for the Cloud project,
  * which no amount of retrying or re-consenting fixes — and keep the raw response underneath.
  */
+private const val BACKUP_PREFS = "backup_state"
+private const val KEY_LAST_RESTORE = "last_restore_at"
+
+/** Restores are a per-device action, so unlike the backup time there's nothing on Drive to read. */
+private fun backupPrefs(context: Context) =
+    context.getSharedPreferences(BACKUP_PREFS, Context.MODE_PRIVATE)
+
 private fun describeDriveFailure(action: String, error: Throwable?): String {
     val raw = error?.message.orEmpty()
     val hint = when {

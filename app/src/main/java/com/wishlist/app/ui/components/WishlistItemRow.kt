@@ -4,8 +4,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DragIndicator
@@ -14,6 +16,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,11 +42,15 @@ import com.wishlist.app.util.formatPonderedDuration
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
+/**
+ * One to-do: the task itself on the left, its 세부항목 on the right. There is deliberately no
+ * complete/uncomplete control here — an item is completed by opening it and setting its 완료일 —
+ * so the only checkboxes on this screen belong to sub-items.
+ */
 @Composable
 fun WishlistItemRow(
     item: WishlistItem,
     dragHandleModifier: Modifier,
-    onToggleCompleted: () -> Unit,
     onToggleSubItem: (index: Int) -> Unit,
     onMoveSubItem: (from: Int, to: Int) -> Unit,
     onClick: () -> Unit,
@@ -60,57 +67,71 @@ fun WishlistItemRow(
     }
 
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Row(
+            // IntrinsicSize.Min gives the row a resolved height; without it the VerticalDivider's
+            // fillMaxHeight has nothing to fill inside the LazyColumn's unbounded constraints and
+            // collapses to zero.
+            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.DragIndicator,
+                contentDescription = "길게 눌러 순서 이동",
+                modifier = dragHandleModifier.alpha(0.4f),
+            )
+
+            Column(
+                modifier = Modifier.weight(1f).clickable(onClick = onClick),
             ) {
-                Icon(
-                    imageVector = Icons.Filled.DragIndicator,
-                    contentDescription = "길게 눌러 순서 이동",
-                    modifier = dragHandleModifier.alpha(0.4f),
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    // Completed items stay in place, struck through, rather than disappearing.
+                    textDecoration = if (item.isCompleted) TextDecoration.LineThrough else null,
                 )
-                Checkbox(checked = item.isCompleted, onCheckedChange = { onToggleCompleted() })
-                Column(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-                    Text(text = item.title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = "시작일: ${formatDate(item.startedAt)}",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    text = if (item.isCompleted) "완료일: ${formatDate(item.completedAt!!)}" else "진행 중",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    text = "고민한 기간: ${formatPonderedDuration(item.ponderedDurationMillis(nowState.value))}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                item.memo?.takeIf { it.isNotBlank() }?.let { memo ->
                     Text(
-                        text = "시작일: ${formatDate(item.startedAt)}",
+                        text = memo,
                         style = MaterialTheme.typography.bodySmall,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    val statusText = if (item.isCompleted) {
-                        "완료일: ${formatDate(item.completedAt!!)}"
-                    } else {
-                        "진행 중"
-                    }
-                    Text(text = statusText, style = MaterialTheme.typography.bodySmall)
-                    Text(
-                        text = "고민한 기간: ${formatPonderedDuration(item.ponderedDurationMillis(nowState.value))}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    item.memo?.takeIf { it.isNotBlank() }?.let { memo ->
-                        Text(
-                            text = memo,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
                 }
             }
 
-            if (item.subItems.isNotEmpty()) {
-                Text(
-                    text = "세부항목 ${item.doneSubItemCount}/${item.subItems.size}",
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(top = 8.dp, start = 32.dp),
-                )
-                SubItemList(
-                    subItems = item.subItems,
-                    onToggle = onToggleSubItem,
-                    onMove = onMoveSubItem,
-                )
+            VerticalDivider()
+
+            Column(modifier = Modifier.weight(1f)) {
+                if (item.subItems.isEmpty()) {
+                    Text(
+                        text = "세부항목 없음",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.alpha(0.5f),
+                    )
+                } else {
+                    Text(
+                        text = "세부항목 ${item.doneSubItemCount}/${item.subItems.size}",
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                    SubItemList(
+                        subItems = item.subItems,
+                        onToggle = onToggleSubItem,
+                        onMove = onMoveSubItem,
+                    )
+                }
             }
         }
     }
@@ -131,7 +152,7 @@ private fun SubItemList(
     var dragOffset by remember { mutableFloatStateOf(0f) }
     var rowHeight by remember { mutableIntStateOf(0) }
 
-    Column(modifier = Modifier.fillMaxWidth().padding(start = 32.dp)) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         subItems.forEachIndexed { index, subItem ->
             val isDragging = draggingIndex == index
             Row(

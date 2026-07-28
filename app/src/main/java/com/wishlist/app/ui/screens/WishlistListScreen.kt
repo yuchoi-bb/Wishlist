@@ -13,9 +13,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -27,11 +27,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.wishlist.app.data.SortField
-import com.wishlist.app.data.StatusFilter
 import com.wishlist.app.data.WishlistItem
 import com.wishlist.app.repository.CategoryGroup
 import com.wishlist.app.repository.WishlistUiState
@@ -58,17 +58,38 @@ private fun buildRows(groups: List<CategoryGroup>): List<ListRow> = buildList {
     }
 }
 
+/**
+ * Moves [movedKey]'s whole block (its header plus its items) to where [targetKey]'s block sits,
+ * returning the rebuilt rows and the dragged header's new index. Null when there's nothing to do.
+ */
+private fun moveGroup(
+    rows: List<ListRow>,
+    movedKey: String,
+    targetKey: String,
+): Pair<List<ListRow>, Int>? {
+    if (movedKey == targetKey) return null
+    val blocks = rows.groupBy { it.categoryKey }
+    val order = rows.filterIsInstance<ListRow.Header>().map { it.categoryKey }.toMutableList()
+    val fromIndex = order.indexOf(movedKey)
+    val toIndex = order.indexOf(targetKey)
+    if (fromIndex < 0 || toIndex < 0) return null
+
+    order.add(toIndex, order.removeAt(fromIndex))
+    val rebuilt = order.flatMap { key -> blocks[key].orEmpty() }
+    return rebuilt to rebuilt.indexOfFirst { it is ListRow.Header && it.categoryKey == movedKey }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WishlistListScreen(
     uiState: WishlistUiState,
-    onStatusFilterChange: (StatusFilter) -> Unit,
+    onShowCompletedChange: (Boolean) -> Unit,
     onSortFieldSelected: (CategoryGroup, SortField) -> Unit,
     onToggleDirection: (CategoryGroup) -> Unit,
-    onToggleCompleted: (WishlistItem) -> Unit,
     onToggleSubItem: (WishlistItem, Int) -> Unit,
     onMoveSubItem: (WishlistItem, Int, Int) -> Unit,
     onReorder: (categoryKey: String, orderedIds: List<String>) -> Unit,
+    onReorderGroups: (orderedCategoryKeys: List<String>) -> Unit,
     onItemClick: (WishlistItem) -> Unit,
     onAddClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -80,20 +101,42 @@ fun WishlistListScreen(
 
     val dragDropState = rememberDragDropState(
         lazyListState = listState,
-        canDrag = { index -> rows.getOrNull(index) is ListRow.Entry },
+        // Headers drag too — they carry their whole group with them.
+        canDrag = { index -> rows.getOrNull(index) != null },
         onMove = { from, to ->
-            val moved = rows.getOrNull(from) as? ListRow.Entry ?: return@rememberDragDropState
-            val target = rows.getOrNull(to) as? ListRow.Entry ?: return@rememberDragDropState
-            // Items belong to their category; dragging across a header would silently recategorize.
-            if (moved.categoryKey != target.categoryKey) return@rememberDragDropState
-            rows = rows.toMutableList().apply { add(to, removeAt(from)) }
+            val moved = rows.getOrNull(from)
+            val target = rows.getOrNull(to)
+            when {
+                moved is ListRow.Header && target != null ->
+                    moveGroup(rows, moved.categoryKey, target.categoryKey)?.let { (newRows, newIndex) ->
+                        rows = newRows
+                        newIndex
+                    }
+
+                moved is ListRow.Entry && target is ListRow.Entry &&
+                    // Items belong to their category; crossing a header would silently recategorize.
+                    moved.categoryKey == target.categoryKey -> {
+                    rows = rows.toMutableList().apply { add(to, removeAt(from)) }
+                    to
+                }
+
+                else -> null
+            }
         },
         onDragFinished = { index ->
-            val dragged = rows.getOrNull(index) as? ListRow.Entry ?: return@rememberDragDropState
-            val orderedIds = rows.filterIsInstance<ListRow.Entry>()
-                .filter { it.categoryKey == dragged.categoryKey }
-                .map { it.item.id }
-            onReorder(dragged.categoryKey, orderedIds)
+            when (val dragged = rows.getOrNull(index)) {
+                is ListRow.Header ->
+                    onReorderGroups(rows.filterIsInstance<ListRow.Header>().map { it.categoryKey })
+
+                is ListRow.Entry -> onReorder(
+                    dragged.categoryKey,
+                    rows.filterIsInstance<ListRow.Entry>()
+                        .filter { it.categoryKey == dragged.categoryKey }
+                        .map { it.item.id },
+                )
+
+                null -> Unit
+            }
         },
     )
 
@@ -125,24 +168,15 @@ fun WishlistListScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             Row(
-                modifier = Modifier.padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                FilterChip(
-                    selected = uiState.statusFilter == StatusFilter.ALL,
-                    onClick = { onStatusFilterChange(StatusFilter.ALL) },
-                    label = { Text("전체") },
+                Checkbox(
+                    checked = uiState.showCompleted,
+                    onCheckedChange = onShowCompletedChange,
                 )
-                FilterChip(
-                    selected = uiState.statusFilter == StatusFilter.IN_PROGRESS,
-                    onClick = { onStatusFilterChange(StatusFilter.IN_PROGRESS) },
-                    label = { Text("진행 중") },
-                )
-                FilterChip(
-                    selected = uiState.statusFilter == StatusFilter.COMPLETED,
-                    onClick = { onStatusFilterChange(StatusFilter.COMPLETED) },
-                    label = { Text("완료") },
-                )
+                Text("완료된 항목 보기")
             }
 
             if (rows.isEmpty() && !uiState.isLoading) {
@@ -176,19 +210,21 @@ fun WishlistListScreen(
                             }
                         }
                         when (row) {
-                            is ListRow.Header -> CategoryGroupHeader(
-                                title = categoryDisplayName(row.group),
-                                sortField = row.group.sortField,
-                                ascending = row.group.ascending,
-                                onSortFieldSelected = { field -> onSortFieldSelected(row.group, field) },
-                                onToggleDirection = { onToggleDirection(row.group) },
-                            )
+                            is ListRow.Header -> Box(modifier = rowModifier) {
+                                CategoryGroupHeader(
+                                    title = categoryDisplayName(row.group),
+                                    sortField = row.group.sortField,
+                                    ascending = row.group.ascending,
+                                    dragHandleModifier = Modifier.dragHandle(dragDropState, index),
+                                    onSortFieldSelected = { field -> onSortFieldSelected(row.group, field) },
+                                    onToggleDirection = { onToggleDirection(row.group) },
+                                )
+                            }
 
                             is ListRow.Entry -> Box(modifier = rowModifier) {
                                 WishlistItemRow(
                                     item = row.item,
                                     dragHandleModifier = Modifier.dragHandle(dragDropState, index),
-                                    onToggleCompleted = { onToggleCompleted(row.item) },
                                     onToggleSubItem = { subIndex -> onToggleSubItem(row.item, subIndex) },
                                     onMoveSubItem = { from, to -> onMoveSubItem(row.item, from, to) },
                                     onClick = { onItemClick(row.item) },

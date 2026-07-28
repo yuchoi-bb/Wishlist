@@ -33,17 +33,17 @@ fun WishlistRoot(viewModel: WishlistViewModel = viewModel()) {
 
     WishlistListScreen(
         uiState = uiState,
-        onStatusFilterChange = viewModel::onStatusFilterChange,
+        onShowCompletedChange = viewModel::onShowCompletedChange,
         onSortFieldSelected = { group, field ->
             viewModel.onSortChange(group.categoryKey, field, group.sortField, group.ascending)
         },
         onToggleDirection = { group ->
             viewModel.onSortChange(group.categoryKey, group.sortField, group.sortField, group.ascending)
         },
-        onToggleCompleted = viewModel::toggleCompleted,
         onToggleSubItem = viewModel::toggleSubItem,
         onMoveSubItem = viewModel::moveSubItem,
         onReorder = viewModel::applyManualOrder,
+        onReorderGroups = viewModel::applyGroupOrder,
         onItemClick = { item ->
             editingItem = item
             showAddEdit = true

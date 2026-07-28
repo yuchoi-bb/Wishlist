@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -20,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import com.wishlist.app.data.SortField
 
@@ -32,14 +34,15 @@ fun sortFieldLabel(field: SortField): String = when (field) {
 }
 
 /**
- * Header for one category group. Each group keeps its own sort field + direction,
- * independent of every other group's setting.
+ * Header for one category group. Each group keeps its own sort field + direction, independent of
+ * every other group's setting, and its handle drags the whole group among the other groups.
  */
 @Composable
 fun CategoryGroupHeader(
     title: String,
     sortField: SortField,
     ascending: Boolean,
+    dragHandleModifier: Modifier,
     onSortFieldSelected: (SortField) -> Unit,
     onToggleDirection: () -> Unit,
 ) {
@@ -51,6 +54,11 @@ fun CategoryGroupHeader(
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Icon(
+            imageVector = Icons.Filled.DragIndicator,
+            contentDescription = "길게 눌러 분류 순서 이동",
+            modifier = dragHandleModifier.alpha(0.4f),
+        )
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,

@@ -7,12 +7,10 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.wishlist.app.auth.AuthManager
 import com.wishlist.app.data.FirestoreWishlistRepository
 import com.wishlist.app.data.SortField
-import com.wishlist.app.data.StatusFilter
 import com.wishlist.app.data.WishlistDatabase
 import com.wishlist.app.data.WishlistItem
 import com.wishlist.app.repository.WishlistRepository
 import com.wishlist.app.repository.WishlistUiState
-import com.wishlist.app.util.todayStartOfDayMillis
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -35,7 +33,7 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
         ?.let { FirestoreWishlistRepository(it) }
     private val repository = WishlistRepository(firestoreRepository, db.categorySortPrefDao())
 
-    private val statusFilter = MutableStateFlow(StatusFilter.ALL)
+    private val showCompleted = MutableStateFlow(false)
 
     val uiState: StateFlow<WishlistUiState> = authManager.currentUser
         .flatMapLatest { user ->
@@ -44,12 +42,12 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
                 flowOf(WishlistUiState(isLoading = false))
             } else {
                 combine(
-                    repository.observeGroups(uid, statusFilter),
-                    statusFilter,
-                ) { groups, filter ->
+                    repository.observeGroups(uid, showCompleted),
+                    showCompleted,
+                ) { groups, includeCompleted ->
                     WishlistUiState(
                         groups = groups,
-                        statusFilter = filter,
+                        showCompleted = includeCompleted,
                         majorCategories = groups.mapNotNull { it.majorCategory }.distinct().sorted(),
                         isLoading = false,
                     )
@@ -58,8 +56,8 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), WishlistUiState())
 
-    fun onStatusFilterChange(filter: StatusFilter) {
-        statusFilter.value = filter
+    fun onShowCompletedChange(show: Boolean) {
+        showCompleted.value = show
     }
 
     /** Tapping the same field again flips direction; tapping a different field switches to it (ascending). */
@@ -85,17 +83,8 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { repository.deleteItem(uid, item) }
     }
 
-    fun toggleCompleted(item: WishlistItem) {
-        val uid = authManager.currentUser.value?.uid ?: return
-        viewModelScope.launch {
-            repository.setCompleted(uid, item, if (item.isCompleted) null else todayStartOfDayMillis())
-        }
-    }
-
-    fun setCompletedAt(item: WishlistItem, completedAt: Long?) {
-        val uid = authManager.currentUser.value?.uid ?: return
-        viewModelScope.launch { repository.setCompleted(uid, item, completedAt) }
-    }
+    // Completion is set by editing an item's 완료일 in the dialog, which goes through saveItem —
+    // there is no longer a one-tap complete control on the list.
 
     fun toggleSubItem(item: WishlistItem, index: Int) {
         val uid = authManager.currentUser.value?.uid ?: return
@@ -115,5 +104,10 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
     fun applyManualOrder(categoryKey: String, orderedIds: List<String>) {
         val uid = authManager.currentUser.value?.uid ?: return
         viewModelScope.launch { repository.applyManualOrder(uid, categoryKey, orderedIds) }
+    }
+
+    /** Commits a finished header drag: the new top-to-bottom order of the category groups. */
+    fun applyGroupOrder(orderedCategoryKeys: List<String>) {
+        viewModelScope.launch { repository.applyGroupOrder(orderedCategoryKeys) }
     }
 }

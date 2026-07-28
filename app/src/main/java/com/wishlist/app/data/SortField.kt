@@ -14,9 +14,3 @@ enum class SortField {
      */
     MANUAL,
 }
-
-enum class StatusFilter {
-    ALL,
-    IN_PROGRESS,
-    COMPLETED,
-}

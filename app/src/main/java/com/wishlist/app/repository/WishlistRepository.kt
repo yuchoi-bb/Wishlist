@@ -4,7 +4,6 @@ import com.wishlist.app.data.CategorySortPref
 import com.wishlist.app.data.CategorySortPrefDao
 import com.wishlist.app.data.FirestoreWishlistRepository
 import com.wishlist.app.data.SortField
-import com.wishlist.app.data.StatusFilter
 import com.wishlist.app.data.SubItem
 import com.wishlist.app.data.WishlistItem
 import java.text.Collator
@@ -35,10 +34,6 @@ class WishlistRepository(
         firestoreRepository?.deleteItem(uid, item)
     }
 
-    suspend fun setCompleted(uid: String, item: WishlistItem, completedAt: Long?) {
-        firestoreRepository?.saveItem(uid, item.copy(completedAt = completedAt))
-    }
-
     suspend fun setSortForCategory(categoryKey: String, field: SortField, ascending: Boolean) {
         sortPrefDao.upsert(CategorySortPref(categoryKey, field, ascending))
     }
@@ -49,41 +44,45 @@ class WishlistRepository(
      */
     suspend fun applyManualOrder(uid: String, categoryKey: String, orderedIds: List<String>) {
         firestoreRepository?.updatePositions(uid, orderedIds)
-        sortPrefDao.upsert(CategorySortPref(categoryKey, SortField.MANUAL, ascending = true))
+        val existing = sortPrefDao.get(categoryKey) ?: CategorySortPref(categoryKey)
+        // copy(), not a fresh row: the group's own groupPosition must survive an item reorder.
+        sortPrefDao.upsert(existing.copy(sortField = SortField.MANUAL, ascending = true))
     }
 
     suspend fun updateSubItems(uid: String, item: WishlistItem, subItems: List<SubItem>) {
         firestoreRepository?.saveItem(uid, item.copy(subItems = subItems))
     }
 
+    /** Stores the dragged order of the category groups, keeping each group's own sort setting. */
+    suspend fun applyGroupOrder(orderedCategoryKeys: List<String>) {
+        orderedCategoryKeys.forEachIndexed { index, key ->
+            val existing = sortPrefDao.get(key) ?: CategorySortPref(key)
+            sortPrefDao.upsert(existing.copy(groupPosition = index.toLong()))
+        }
+    }
+
     private fun itemsFlow(uid: String): Flow<List<WishlistItem>> =
         firestoreRepository?.observeItems(uid) ?: flowOf(emptyList())
 
-    /** Combines real-time Firestore items, per-category sort prefs and the status filter into
-     * grouped, sorted UI state. */
+    /** Combines real-time Firestore items, per-category sort prefs and the show-completed toggle
+     * into grouped, sorted UI state. */
     fun observeGroups(
         uid: String,
-        statusFilter: Flow<StatusFilter>,
+        showCompleted: Flow<Boolean>,
     ): Flow<List<CategoryGroup>> =
         combine(
             itemsFlow(uid),
             sortPrefDao.observeAll(),
-            statusFilter,
-        ) { items, prefs, filter ->
+            showCompleted,
+        ) { items, prefs, includeCompleted ->
             val prefsByKey = prefs.associateBy { it.categoryKey }
             val now = System.currentTimeMillis()
 
-            val filtered = items.filter { item ->
-                when (filter) {
-                    StatusFilter.ALL -> true
-                    StatusFilter.IN_PROGRESS -> !item.isCompleted
-                    StatusFilter.COMPLETED -> item.isCompleted
-                }
-            }
+            val filtered = items.filter { includeCompleted || !it.isCompleted }
 
+            val keyComparator = categoryKeyComparator()
             filtered
                 .groupBy { it.categoryKey }
-                .toSortedMap(categoryKeyComparator())
                 .map { (key, groupItems) ->
                     val pref = prefsByKey[key] ?: CategorySortPref(key)
                     CategoryGroup(
@@ -92,9 +91,16 @@ class WishlistRepository(
                         minorCategory = groupItems.first().minorCategory,
                         sortField = pref.sortField,
                         ascending = pref.ascending,
+                        groupPosition = pref.groupPosition,
                         items = sortGroupItems(groupItems, pref.sortField, pref.ascending, now),
                     )
                 }
+                // Hand-arranged groups first in the order they were dragged into; everything else
+                // keeps the alphabetical fallback (with 미분류 last).
+                .sortedWith(
+                    compareBy<CategoryGroup> { it.groupPosition }
+                        .thenComparator { a, b -> keyComparator.compare(a.categoryKey, b.categoryKey) },
+                )
         }
 
     private fun categoryKeyComparator(): Comparator<String> {

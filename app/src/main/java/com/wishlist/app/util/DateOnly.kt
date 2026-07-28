@@ -5,6 +5,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private val dateFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd")
+private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm")
 
 /**
  * 시작일/완료일 are dates, not timestamps, so every stored value is normalized to local
@@ -22,3 +23,7 @@ fun todayStartOfDayMillis(): Long = System.currentTimeMillis().toStartOfDayMilli
 
 fun formatDate(epochMillis: Long): String =
     Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(dateFormatter)
+
+/** For things that happen at a moment rather than on a day, e.g. when a backup last ran. */
+fun formatDateTime(epochMillis: Long): String =
+    Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(dateTimeFormatter)

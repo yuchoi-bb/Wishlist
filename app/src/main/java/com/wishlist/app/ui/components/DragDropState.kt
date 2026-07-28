@@ -21,15 +21,17 @@ import kotlinx.coroutines.flow.receiveAsFlow
 /**
  * Long-press drag reordering for a [androidx.compose.foundation.lazy.LazyColumn].
  *
- * [canDrag] gates which rows participate — the list interleaves category headers with items, and
- * only items may move. [onMove] is called on every swap so the list animates while the finger is
- * down; [onDragFinished] is where the result should be persisted, so one drag is one write.
+ * [canDrag] gates which rows participate. [onMove] is called on every swap so the list rearranges
+ * while the finger is down, and returns where the dragged row ended up — dragging a category
+ * header moves that whole group as a block, so its new index is not simply the target's. Returning
+ * null means "it landed on the target index". [onDragFinished] is where the result should be
+ * persisted, so one drag is one write.
  */
 @Composable
 fun rememberDragDropState(
     lazyListState: LazyListState,
     canDrag: (index: Int) -> Boolean,
-    onMove: (from: Int, to: Int) -> Unit,
+    onMove: (from: Int, to: Int) -> Int?,
     onDragFinished: (draggedIndex: Int) -> Unit,
 ): DragDropState {
     val state = remember(lazyListState) {
@@ -44,7 +46,7 @@ fun rememberDragDropState(
 class DragDropState internal constructor(
     private val state: LazyListState,
     private val canDrag: (Int) -> Boolean,
-    private val onMove: (Int, Int) -> Unit,
+    private val onMove: (Int, Int) -> Int?,
     private val onDragFinished: (Int) -> Unit,
 ) {
     var draggingItemIndex by mutableStateOf<Int?>(null)
@@ -94,8 +96,7 @@ class DragDropState internal constructor(
         }
 
         if (target != null) {
-            onMove(dragging.index, target.index)
-            draggingItemIndex = target.index
+            draggingItemIndex = onMove(dragging.index, target.index) ?: target.index
         } else {
             // Nothing to swap with: near an edge, scroll the list instead so long lists stay reachable.
             val overscroll = when {
