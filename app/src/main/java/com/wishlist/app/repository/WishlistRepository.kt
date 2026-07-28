@@ -134,7 +134,8 @@ class WishlistRepository(
 
     private fun fieldComparator(field: SortField, now: Long): Comparator<WishlistItem> =
         when (field) {
-            SortField.COMPLETED_AT -> Comparator.comparingLong { it.completedAt ?: now }
+            // Items with no 종료일 sort as if theirs were today, keeping them among current work.
+            SortField.COMPLETED_AT -> Comparator.comparingLong { it.endDate ?: now }
             SortField.STARTED_AT -> Comparator.comparingLong { it.startedAt }
             SortField.DURATION -> Comparator.comparingLong { it.ponderedDurationMillis(now) }
             SortField.TITLE -> {

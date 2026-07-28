@@ -63,17 +63,23 @@ class FirestoreWishlistRepository(private val firestore: FirebaseFirestore) {
         itemsCollection(uid).get().await().documents.map { it.toWishlistItem() }
 }
 
-private fun DocumentSnapshot.toWishlistItem(): WishlistItem = WishlistItem(
-    id = id,
-    title = getString("title") ?: "",
-    memo = getString("memo"),
-    subItems = readSubItems(),
-    majorCategory = getString("majorCategory"),
-    minorCategory = getString("minorCategory"),
-    startedAt = getLong("startedAt") ?: 0L,
-    completedAt = getLong("completedAt"),
-    position = getLong("position") ?: 0L,
-)
+private fun DocumentSnapshot.toWishlistItem(): WishlistItem {
+    // Documents written before 완료일 was split into 종료일 + 완료 only have completedAt, which
+    // meant "finished on this date" — read it as both the end date and the done flag.
+    val legacyCompletedAt = getLong("completedAt")
+    return WishlistItem(
+        id = id,
+        title = getString("title") ?: "",
+        memo = getString("memo"),
+        subItems = readSubItems(),
+        majorCategory = getString("majorCategory"),
+        minorCategory = getString("minorCategory"),
+        startedAt = getLong("startedAt") ?: 0L,
+        endDate = getLong("endDate") ?: legacyCompletedAt,
+        isDone = getBoolean("isDone") ?: (legacyCompletedAt != null),
+        position = getLong("position") ?: 0L,
+    )
+}
 
 @Suppress("UNCHECKED_CAST")
 private fun DocumentSnapshot.readSubItems(): List<SubItem> {
@@ -95,6 +101,7 @@ private fun WishlistItem.toFirestoreMap(): Map<String, Any?> = mapOf(
     // Normalized on every write, so items created before 시작일/완료일 became date-only (and any
     // restored from an older backup) get cleaned up the next time they're saved.
     "startedAt" to startedAt.toStartOfDayMillis(),
-    "completedAt" to completedAt?.toStartOfDayMillis(),
+    "endDate" to endDate?.toStartOfDayMillis(),
+    "isDone" to isDone,
     "position" to position,
 )

@@ -138,7 +138,8 @@ private fun WishlistItem.toJson(): JSONObject = JSONObject().apply {
     put("majorCategory", majorCategory)
     put("minorCategory", minorCategory)
     put("startedAt", startedAt)
-    put("completedAt", completedAt)
+    put("endDate", endDate)
+    put("isDone", isDone)
     put("position", position)
 }
 
@@ -155,7 +156,13 @@ private fun JSONObject.toWishlistItem(): WishlistItem = WishlistItem(
     majorCategory = if (isNull("majorCategory")) null else optString("majorCategory"),
     minorCategory = if (isNull("minorCategory")) null else optString("minorCategory"),
     startedAt = getLong("startedAt"),
-    completedAt = if (isNull("completedAt") || !has("completedAt")) null else optLong("completedAt"),
+    // Older backups only carry completedAt, which meant "finished on this date".
+    endDate = when {
+        has("endDate") && !isNull("endDate") -> optLong("endDate")
+        has("completedAt") && !isNull("completedAt") -> optLong("completedAt")
+        else -> null
+    },
+    isDone = if (has("isDone")) optBoolean("isDone") else has("completedAt") && !isNull("completedAt"),
     position = optLong("position", 0L),
 )
 

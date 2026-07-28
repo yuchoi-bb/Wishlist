@@ -18,8 +18,14 @@ data class WishlistItem(
     val minorCategory: String? = null,
     /** "시작일" — date only (local start-of-day), defaults to the creation date, user-editable. */
     val startedAt: Long = 0,
-    /** "완료일" — date only, null means still in progress. */
-    val completedAt: Long? = null,
+    /**
+     * "종료일" — the date this is *meant* to be finished by, date only, null if none is set.
+     * Being finished is tracked separately by [isDone], so a future target date doesn't make an
+     * item look complete.
+     */
+    val endDate: Long? = null,
+    /** "완료" — whether the task is actually finished. */
+    val isDone: Boolean = false,
     /**
      * Rank within its category group under SortField.MANUAL. A reorder rewrites these as 0,1,2…,
      * while newly created items get a millisecond timestamp so they land after anything already
@@ -27,11 +33,11 @@ data class WishlistItem(
      */
     val position: Long = 0,
 ) {
-    val isCompleted: Boolean get() = completedAt != null
+    val isCompleted: Boolean get() = isDone
 
-    /** "고민한 기간": elapsed time between startedAt and completedAt, or now if still in progress. */
+    /** Elapsed time from 시작일 to the 종료일 (or now while unfinished). */
     fun ponderedDurationMillis(now: Long): Long {
-        val end = completedAt ?: now
+        val end = if (isDone) endDate ?: now else now
         return (end - startedAt).coerceAtLeast(0)
     }
 

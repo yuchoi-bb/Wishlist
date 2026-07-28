@@ -6,13 +6,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,7 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.wishlist.app.data.SubItem
 import com.wishlist.app.data.WishlistItem
 import com.wishlist.app.util.formatDate
-import com.wishlist.app.util.formatPonderedDuration
+import com.wishlist.app.util.formatRemainingDays
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -89,16 +93,21 @@ fun WishlistItemRow(
                     // Completed items stay in place, struck through, rather than disappearing.
                     textDecoration = if (item.isCompleted) TextDecoration.LineThrough else null,
                 )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                 Text(
-                    text = "시작일: ${formatDate(item.startedAt)}",
+                    text = "시작일  ${formatDate(item.startedAt)}",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Text(
-                    text = if (item.isCompleted) "완료일: ${formatDate(item.completedAt!!)}" else "진행 중",
+                    text = "종료일  " + (item.endDate?.let { formatDate(it) } ?: "-"),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Text(
-                    text = "고민한 기간: ${formatPonderedDuration(item.ponderedDurationMillis(nowState.value))}",
+                    text = "남은날짜  " + if (item.isDone) {
+                        "완료"
+                    } else {
+                        formatRemainingDays(item.endDate, nowState.value)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -106,7 +115,7 @@ fun WishlistItemRow(
                     Text(
                         text = memo,
                         style = MaterialTheme.typography.bodySmall,
-                        maxLines = 3,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -118,14 +127,10 @@ fun WishlistItemRow(
                 if (item.subItems.isEmpty()) {
                     Text(
                         text = "세부항목 없음",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.alpha(0.5f),
                     )
                 } else {
-                    Text(
-                        text = "세부항목 ${item.doneSubItemCount}/${item.subItems.size}",
-                        style = MaterialTheme.typography.labelMedium,
-                    )
                     SubItemList(
                         subItems = item.subItems,
                         onToggle = onToggleSubItem,
@@ -194,11 +199,20 @@ private fun SubItemList(
                     .onSizeChanged { rowHeight = it.height },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Checkbox(checked = subItem.done, onCheckedChange = { onToggle(index) })
+                // Phone screens are narrow and this column is only half the card: shrink the
+                // checkbox to reclaim width, then keep each sub-item to one ellipsized line.
+                Checkbox(
+                    checked = subItem.done,
+                    onCheckedChange = { onToggle(index) },
+                    modifier = Modifier.size(28.dp),
+                )
+                Spacer(Modifier.width(6.dp))
                 Text(
                     text = subItem.title,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     textDecoration = if (subItem.done) TextDecoration.LineThrough else null,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }

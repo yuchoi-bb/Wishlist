@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.wishlist.app.data.SortField
 
 fun sortFieldLabel(field: SortField): String = when (field) {
-    SortField.COMPLETED_AT -> "완료일"
+    SortField.COMPLETED_AT -> "종료일"
     SortField.STARTED_AT -> "시작일"
     SortField.DURATION -> "고민한 기간"
     SortField.TITLE -> "할 일 이름"

@@ -55,7 +55,8 @@ fun AddEditItemDialog(
     var majorCategory by remember { mutableStateOf(editingItem?.majorCategory.orEmpty()) }
     var minorCategory by remember { mutableStateOf(editingItem?.minorCategory.orEmpty()) }
     var startedAt by remember { mutableStateOf(editingItem?.startedAt ?: todayStartOfDayMillis()) }
-    var completedAt by remember { mutableStateOf(editingItem?.completedAt) }
+    var endDate by remember { mutableStateOf(editingItem?.endDate) }
+    var isDone by remember { mutableStateOf(editingItem?.isDone ?: false) }
     val subItems = remember { mutableStateListOf<SubItem>().apply { addAll(editingItem?.subItems.orEmpty()) } }
     var newSubItemTitle by remember { mutableStateOf("") }
 
@@ -172,18 +173,25 @@ fun AddEditItemDialog(
                 )
                 Spacer(Modifier.height(16.dp))
 
-                // Setting a 완료일 is what marks the item complete; clearing it returns it to 진행 중.
+                // 종료일 is the date this is meant to be finished by, which is what 남은날짜 counts
+                // down to. Whether it's actually finished is the separate 완료 checkbox below.
                 DateField(
-                    label = "완료일",
-                    epochMillis = completedAt,
-                    emptyLabel = "진행 중 (탭하여 완료일 지정)",
-                    onValueChange = { completedAt = it },
+                    label = "종료일 (목표)",
+                    epochMillis = endDate,
+                    emptyLabel = "지정 안 됨 (탭하여 선택)",
+                    onValueChange = { endDate = it },
                     trailingContent = {
-                        if (completedAt != null) {
-                            TextButton(onClick = { completedAt = null }) { Text("지우기") }
+                        if (endDate != null) {
+                            TextButton(onClick = { endDate = null }) { Text("지우기") }
                         }
                     },
                 )
+                Spacer(Modifier.height(8.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = isDone, onCheckedChange = { isDone = it })
+                    Text("완료")
+                }
                 Spacer(Modifier.height(20.dp))
 
                 Row(
@@ -208,7 +216,8 @@ fun AddEditItemDialog(
                                     majorCategory = majorCategory.trim().ifBlank { null },
                                     minorCategory = minorCategory.trim().ifBlank { null },
                                     startedAt = startedAt,
-                                    completedAt = completedAt,
+                                    endDate = endDate,
+                                    isDone = isDone,
                                     // A reorder rewrites ranks as 0,1,2…, so a timestamp puts new
                                     // items after anything already arranged by hand.
                                     position = editingItem?.position ?: System.currentTimeMillis(),
