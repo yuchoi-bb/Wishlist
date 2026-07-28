@@ -1,9 +1,9 @@
 package com.wishlist.app.repository
 
-import com.wishlist.app.data.CategorySortPref
-import com.wishlist.app.data.CategorySortPrefDao
 import com.wishlist.app.data.FirestoreWishlistRepository
 import com.wishlist.app.data.SortField
+import com.wishlist.app.data.SortPreference
+import com.wishlist.app.data.SortPreferenceDao
 import com.wishlist.app.data.SubItem
 import com.wishlist.app.data.WishlistItem
 import java.text.Collator
@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.map
 class WishlistRepository(
     // Null before google-services.json/Firebase project setup is complete.
     private val firestoreRepository: FirestoreWishlistRepository?,
-    private val sortPrefDao: CategorySortPrefDao,
+    private val sortPreferenceDao: SortPreferenceDao,
 ) {
     fun observeMinorCategories(uid: String, major: String): Flow<List<String>> =
         itemsFlow(uid).map { items ->
@@ -34,114 +34,58 @@ class WishlistRepository(
         firestoreRepository?.deleteItem(uid, item)
     }
 
-    suspend fun setSortForCategory(categoryKey: String, field: SortField, ascending: Boolean) {
-        sortPrefDao.upsert(CategorySortPref(categoryKey, field, ascending))
-    }
-
-    /**
-     * Persists a hand-arranged order and pins the group to it — leaving the group on a computed
-     * sort would just re-sort the items and throw the drag away on the next emission.
-     */
-    suspend fun applyManualOrder(uid: String, categoryKey: String, orderedIds: List<String>) {
-        firestoreRepository?.updatePositions(uid, orderedIds)
-        val existing = sortPrefDao.get(categoryKey) ?: CategorySortPref(categoryKey)
-        // copy(), not a fresh row: the group's own groupPosition must survive an item reorder.
-        sortPrefDao.upsert(existing.copy(sortField = SortField.MANUAL, ascending = true))
-    }
-
     suspend fun updateSubItems(uid: String, item: WishlistItem, subItems: List<SubItem>) {
         firestoreRepository?.saveItem(uid, item.copy(subItems = subItems))
     }
 
-    /** Stores the dragged order of the category groups, keeping each group's own sort setting. */
-    suspend fun applyGroupOrder(orderedCategoryKeys: List<String>) {
-        orderedCategoryKeys.forEachIndexed { index, key ->
-            val existing = sortPrefDao.get(key) ?: CategorySortPref(key)
-            sortPrefDao.upsert(existing.copy(groupPosition = index.toLong()))
-        }
+    fun observeSortPreference(): Flow<SortPreference> =
+        sortPreferenceDao.observe().map { it ?: SortPreference() }
+
+    suspend fun setSort(sortField: SortField, ascending: Boolean) {
+        sortPreferenceDao.upsert(SortPreference(sortField = sortField, ascending = ascending))
     }
 
     private fun itemsFlow(uid: String): Flow<List<WishlistItem>> =
         firestoreRepository?.observeItems(uid) ?: flowOf(emptyList())
 
-    /** Combines real-time Firestore items, per-category sort prefs and the show-completed toggle
-     * into grouped, sorted UI state. */
-    fun observeGroups(
-        uid: String,
-        showCompleted: Flow<Boolean>,
-    ): Flow<List<CategoryGroup>> =
+    /** Flattens items into one row per 세부항목 and sorts the whole table by the chosen field. */
+    fun observeRows(uid: String, showCompleted: Flow<Boolean>): Flow<List<TableRow>> =
         combine(
             itemsFlow(uid),
-            sortPrefDao.observeAll(),
+            observeSortPreference(),
             showCompleted,
-        ) { items, prefs, includeCompleted ->
-            val prefsByKey = prefs.associateBy { it.categoryKey }
-            val now = System.currentTimeMillis()
-
-            val filtered = items.filter { includeCompleted || !it.isCompleted }
-
-            val keyComparator = categoryKeyComparator()
-            filtered
-                .groupBy { it.categoryKey }
-                .map { (key, groupItems) ->
-                    val pref = prefsByKey[key] ?: CategorySortPref(key)
-                    CategoryGroup(
-                        categoryKey = key,
-                        majorCategory = groupItems.first().majorCategory,
-                        minorCategory = groupItems.first().minorCategory,
-                        sortField = pref.sortField,
-                        ascending = pref.ascending,
-                        groupPosition = pref.groupPosition,
-                        items = sortGroupItems(groupItems, pref.sortField, pref.ascending, now),
-                    )
+        ) { items, preference, includeCompleted ->
+            val rows = items.flatMap { item ->
+                if (item.subItems.isEmpty()) {
+                    listOf(TableRow(item, subItem = null, subIndex = -1))
+                } else {
+                    item.subItems.mapIndexed { index, sub -> TableRow(item, sub, index) }
                 }
-                // Hand-arranged groups first in the order they were dragged into; everything else
-                // keeps the alphabetical fallback (with 미분류 last).
-                .sortedWith(
-                    compareBy<CategoryGroup> { it.groupPosition }
-                        .thenComparator { a, b -> keyComparator.compare(a.categoryKey, b.categoryKey) },
-                )
+            }
+
+            val visible = rows.filter { includeCompleted || !it.isDone }
+            val comparator = rowComparator(preference.sortField)
+            visible.sortedWith(if (preference.ascending) comparator else comparator.reversed())
         }
 
-    private fun categoryKeyComparator(): Comparator<String> {
+    private fun rowComparator(field: SortField): Comparator<TableRow> {
         val collator = Collator.getInstance(Locale.KOREAN)
-        return Comparator { a, b ->
-            when {
-                a == WishlistItem.UNCATEGORIZED_KEY && b == WishlistItem.UNCATEGORIZED_KEY -> 0
-                a == WishlistItem.UNCATEGORIZED_KEY -> 1
-                b == WishlistItem.UNCATEGORIZED_KEY -> -1
-                else -> collator.compare(a, b)
+        // Rows with nothing in the sorted field go last either way rather than clumping at the top.
+        val farFuture = Long.MAX_VALUE
+        return when (field) {
+            SortField.END_DATE -> compareBy { it.effectiveEndDate ?: farFuture }
+            SortField.PRIORITY -> compareBy { it.item.priority }
+            SortField.START_DATE -> compareBy { it.item.startedAt }
+            SortField.MAJOR_CATEGORY -> Comparator { a, b ->
+                collator.compare(a.item.majorCategory.orEmpty(), b.item.majorCategory.orEmpty())
             }
+            SortField.MINOR_CATEGORY -> Comparator { a, b ->
+                collator.compare(a.item.minorCategory.orEmpty(), b.item.minorCategory.orEmpty())
+            }
+            SortField.SUB_ITEM -> Comparator { a, b ->
+                collator.compare(a.subItem?.title.orEmpty(), b.subItem?.title.orEmpty())
+            }
+            SortField.TITLE -> Comparator { a, b -> collator.compare(a.item.title, b.item.title) }
         }
     }
-
-    /** In-progress (no 완료일) items always sink to the bottom, regardless of chosen direction. */
-    private fun sortGroupItems(
-        items: List<WishlistItem>,
-        field: SortField,
-        ascending: Boolean,
-        now: Long,
-    ): List<WishlistItem> {
-        // Manual order is exactly what the user dragged: no direction flip, and no sinking of
-        // in-progress items, since either would move rows away from where they were dropped.
-        if (field == SortField.MANUAL) return items.sortedBy { it.position }
-
-        val fieldComparator = fieldComparator(field, now)
-        val directional = if (ascending) fieldComparator else fieldComparator.reversed()
-        val (completed, inProgress) = items.partition { it.isCompleted }
-        return completed.sortedWith(directional) + inProgress.sortedWith(directional)
-    }
-
-    private fun fieldComparator(field: SortField, now: Long): Comparator<WishlistItem> =
-        when (field) {
-            // Items with no 종료일 sort as if theirs were today, keeping them among current work.
-            SortField.COMPLETED_AT -> Comparator.comparingLong { it.endDate ?: now }
-            SortField.STARTED_AT -> Comparator.comparingLong { it.startedAt }
-            SortField.DURATION -> Comparator.comparingLong { it.ponderedDurationMillis(now) }
-            SortField.TITLE -> {
-                val collator = Collator.getInstance(Locale.KOREAN)
-                Comparator { a, b -> collator.compare(a.title, b.title) }
-            }
-            SortField.MANUAL -> Comparator.comparingLong { it.position }
-        }
 }

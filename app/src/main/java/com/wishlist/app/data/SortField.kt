@@ -1,16 +1,17 @@
 package com.wishlist.app.data
 
-/** Sort criteria a category group can be sorted by, independently of every other group. */
+/**
+ * How the main table is ordered. Sorting applies to the whole table at once — each row is one
+ * 세부항목 — rather than being chosen separately per category.
+ */
 enum class SortField {
-    COMPLETED_AT,
-    STARTED_AT,
-    DURATION,
+    /** 세부항목's own 종료일, falling back to its item's 최종 종료일. */
+    END_DATE,
+    PRIORITY,
+    MAJOR_CATEGORY,
+    MINOR_CATEGORY,
+    /** 세부항목 name, i.e. the 소분류. */
+    SUB_ITEM,
     TITLE,
-
-    /**
-     * The order the user dragged items into, stored per item as [com.wishlist.app.data.WishlistItem.position].
-     * A group switches to this automatically when an item in it is dragged — any other sort would
-     * immediately undo the drag.
-     */
-    MANUAL,
+    START_DATE,
 }

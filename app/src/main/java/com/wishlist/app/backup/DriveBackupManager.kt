@@ -10,9 +10,9 @@ import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
 import com.google.api.services.drive.model.File as DriveFile
-import com.wishlist.app.data.CategorySortPref
 import com.wishlist.app.data.FirestoreWishlistRepository
 import com.wishlist.app.data.SortField
+import com.wishlist.app.data.SortPreference
 import com.wishlist.app.data.SubItem
 import com.wishlist.app.data.WishlistDatabase
 import com.wishlist.app.data.WishlistItem
@@ -94,10 +94,10 @@ class DriveBackupManager(
 
     private suspend fun exportJson(uid: String): String {
         val items = firestoreRepository.getAllItemsOnce(uid)
-        val prefs = database.categorySortPrefDao().observeAll().first()
+        val sort = database.sortPreferenceDao().observe().first() ?: SortPreference()
         return JSONObject().apply {
             put("items", JSONArray(items.map { it.toJson() }))
-            put("prefs", JSONArray(prefs.map { it.toJson() }))
+            put("sort", sort.toJson())
         }.toString()
     }
 
@@ -107,12 +107,9 @@ class DriveBackupManager(
         for (i in 0 until items.length()) {
             firestoreRepository.saveItem(uid, items.getJSONObject(i).toWishlistItem())
         }
-        val prefs = root.optJSONArray("prefs")
-        if (prefs != null) {
-            for (i in 0 until prefs.length()) {
-                database.categorySortPrefDao().upsert(prefs.getJSONObject(i).toCategorySortPref())
-            }
-        }
+        // Older backups carried a "prefs" array of per-category sorts, which no longer exists now
+        // that one sort applies to the whole table; those are simply skipped.
+        root.optJSONObject("sort")?.let { database.sortPreferenceDao().upsert(it.toSortPreference()) }
     }
 
     companion object {
@@ -131,6 +128,7 @@ private fun WishlistItem.toJson(): JSONObject = JSONObject().apply {
                 JSONObject().apply {
                     put("title", sub.title)
                     put("done", sub.done)
+                    put("endDate", sub.endDate)
                 }
             },
         ),
@@ -140,6 +138,7 @@ private fun WishlistItem.toJson(): JSONObject = JSONObject().apply {
     put("startedAt", startedAt)
     put("endDate", endDate)
     put("isDone", isDone)
+    put("priority", priority)
     put("position", position)
 }
 
@@ -150,7 +149,11 @@ private fun JSONObject.toWishlistItem(): WishlistItem = WishlistItem(
     subItems = optJSONArray("subItems")?.let { array ->
         (0 until array.length()).map { i ->
             val entry = array.getJSONObject(i)
-            SubItem(title = entry.optString("title"), done = entry.optBoolean("done"))
+            SubItem(
+                title = entry.optString("title"),
+                done = entry.optBoolean("done"),
+                endDate = if (entry.isNull("endDate")) null else entry.optLong("endDate"),
+            )
         }
     }.orEmpty(),
     majorCategory = if (isNull("majorCategory")) null else optString("majorCategory"),
@@ -163,19 +166,16 @@ private fun JSONObject.toWishlistItem(): WishlistItem = WishlistItem(
         else -> null
     },
     isDone = if (has("isDone")) optBoolean("isDone") else has("completedAt") && !isNull("completedAt"),
+    priority = optInt("priority", WishlistItem.DEFAULT_PRIORITY),
     position = optLong("position", 0L),
 )
 
-private fun CategorySortPref.toJson(): JSONObject = JSONObject().apply {
-    put("categoryKey", categoryKey)
+private fun SortPreference.toJson(): JSONObject = JSONObject().apply {
     put("sortField", sortField.name)
     put("ascending", ascending)
-    put("groupPosition", groupPosition)
 }
 
-private fun JSONObject.toCategorySortPref(): CategorySortPref = CategorySortPref(
-    categoryKey = getString("categoryKey"),
-    sortField = runCatching { SortField.valueOf(getString("sortField")) }.getOrDefault(SortField.COMPLETED_AT),
-    ascending = getBoolean("ascending"),
-    groupPosition = optLong("groupPosition", CategorySortPref.UNSET_GROUP_POSITION),
+private fun JSONObject.toSortPreference(): SortPreference = SortPreference(
+    sortField = runCatching { SortField.valueOf(getString("sortField")) }.getOrDefault(SortField.END_DATE),
+    ascending = optBoolean("ascending", true),
 )

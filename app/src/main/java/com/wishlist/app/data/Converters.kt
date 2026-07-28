@@ -8,5 +8,5 @@ class Converters {
 
     @TypeConverter
     fun stringToSortField(value: String): SortField =
-        runCatching { SortField.valueOf(value) }.getOrDefault(SortField.COMPLETED_AT)
+        runCatching { SortField.valueOf(value) }.getOrDefault(SortField.END_DATE)
 }

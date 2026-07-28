@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -26,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +59,7 @@ fun AddEditItemDialog(
     var startedAt by remember { mutableStateOf(editingItem?.startedAt ?: todayStartOfDayMillis()) }
     var endDate by remember { mutableStateOf(editingItem?.endDate) }
     var isDone by remember { mutableStateOf(editingItem?.isDone ?: false) }
+    var priority by remember { mutableIntStateOf(editingItem?.priority ?: WishlistItem.DEFAULT_PRIORITY) }
     val subItems = remember { mutableStateListOf<SubItem>().apply { addAll(editingItem?.subItems.orEmpty()) } }
     var newSubItemTitle by remember { mutableStateOf("") }
 
@@ -100,23 +103,40 @@ fun AddEditItemDialog(
 
                 Text("세부항목", style = MaterialTheme.typography.titleSmall)
                 subItems.forEachIndexed { index, subItem ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Checkbox(
-                            checked = subItem.done,
-                            onCheckedChange = { subItems[index] = subItem.copy(done = it) },
-                        )
-                        OutlinedTextField(
-                            value = subItem.title,
-                            onValueChange = { subItems[index] = subItem.copy(title = it) },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                        )
-                        IconButton(onClick = { subItems.removeAt(index) }) {
-                            Icon(Icons.Filled.Close, contentDescription = "세부항목 삭제")
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(
+                                checked = subItem.done,
+                                onCheckedChange = { subItems[index] = subItem.copy(done = it) },
+                            )
+                            OutlinedTextField(
+                                value = subItem.title,
+                                onValueChange = { subItems[index] = subItem.copy(title = it) },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                            )
+                            IconButton(onClick = { subItems.removeAt(index) }) {
+                                Icon(Icons.Filled.Close, contentDescription = "세부항목 삭제")
+                            }
                         }
+                        // Each 세부항목 carries its own deadline; the table sorts rows by it.
+                        DateField(
+                            label = "세부항목 종료일",
+                            epochMillis = subItem.endDate,
+                            emptyLabel = "지정 안 됨",
+                            onValueChange = { subItems[index] = subItem.copy(endDate = it) },
+                            trailingContent = {
+                                if (subItem.endDate != null) {
+                                    TextButton(onClick = { subItems[index] = subItem.copy(endDate = null) }) {
+                                        Text("지우기")
+                                    }
+                                }
+                            },
+                        )
+                        Spacer(Modifier.height(8.dp))
                     }
                 }
                 Row(
@@ -192,6 +212,18 @@ fun AddEditItemDialog(
                     Checkbox(checked = isDone, onCheckedChange = { isDone = it })
                     Text("완료")
                 }
+                Spacer(Modifier.height(12.dp))
+
+                Text("우선순위", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    WishlistItem.PRIORITIES.forEach { value ->
+                        FilterChip(
+                            selected = priority == value,
+                            onClick = { priority = value },
+                            label = { Text("$value") },
+                        )
+                    }
+                }
                 Spacer(Modifier.height(20.dp))
 
                 Row(
@@ -218,6 +250,7 @@ fun AddEditItemDialog(
                                     startedAt = startedAt,
                                     endDate = endDate,
                                     isDone = isDone,
+                                    priority = priority,
                                     // A reorder rewrites ranks as 0,1,2…, so a timestamp puts new
                                     // items after anything already arranged by hand.
                                     position = editingItem?.position ?: System.currentTimeMillis(),

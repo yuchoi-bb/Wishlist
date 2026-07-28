@@ -44,21 +44,6 @@ class FirestoreWishlistRepository(private val firestore: FirebaseFirestore) {
         itemsCollection(uid).document(item.id).delete().await()
     }
 
-    /**
-     * Writes the new manual ranks for one reordered group as a single batch — a drag produces many
-     * intermediate swaps, so committing once at the end keeps it to one round trip.
-     */
-    suspend fun updatePositions(uid: String, orderedIds: List<String>) {
-        val collection = itemsCollection(uid)
-        val batch = firestore.batch()
-        orderedIds.forEachIndexed { index, id ->
-            if (id.isNotBlank()) {
-                batch.update(collection.document(id), "position", index.toLong())
-            }
-        }
-        batch.commit().await()
-    }
-
     suspend fun getAllItemsOnce(uid: String): List<WishlistItem> =
         itemsCollection(uid).get().await().documents.map { it.toWishlistItem() }
 }
@@ -77,6 +62,7 @@ private fun DocumentSnapshot.toWishlistItem(): WishlistItem {
         startedAt = getLong("startedAt") ?: 0L,
         endDate = getLong("endDate") ?: legacyCompletedAt,
         isDone = getBoolean("isDone") ?: (legacyCompletedAt != null),
+        priority = (getLong("priority") ?: WishlistItem.DEFAULT_PRIORITY.toLong()).toInt(),
         position = getLong("position") ?: 0L,
     )
 }
@@ -88,6 +74,7 @@ private fun DocumentSnapshot.readSubItems(): List<SubItem> {
         SubItem(
             title = entry["title"] as? String ?: "",
             done = entry["done"] as? Boolean ?: false,
+            endDate = (entry["endDate"] as? Number)?.toLong(),
         )
     }
 }
@@ -95,7 +82,13 @@ private fun DocumentSnapshot.readSubItems(): List<SubItem> {
 private fun WishlistItem.toFirestoreMap(): Map<String, Any?> = mapOf(
     "title" to title,
     "memo" to memo,
-    "subItems" to subItems.map { mapOf("title" to it.title, "done" to it.done) },
+    "subItems" to subItems.map {
+        mapOf(
+            "title" to it.title,
+            "done" to it.done,
+            "endDate" to it.endDate?.toStartOfDayMillis(),
+        )
+    },
     "majorCategory" to majorCategory,
     "minorCategory" to minorCategory,
     // Normalized on every write, so items created before 시작일/완료일 became date-only (and any
@@ -103,5 +96,6 @@ private fun WishlistItem.toFirestoreMap(): Map<String, Any?> = mapOf(
     "startedAt" to startedAt.toStartOfDayMillis(),
     "endDate" to endDate?.toStartOfDayMillis(),
     "isDone" to isDone,
+    "priority" to priority,
     "position" to position,
 )

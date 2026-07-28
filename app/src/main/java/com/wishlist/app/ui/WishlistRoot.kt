@@ -11,7 +11,7 @@ import com.wishlist.app.data.WishlistItem
 import com.wishlist.app.ui.screens.AddEditItemDialog
 import com.wishlist.app.ui.screens.SettingsScreen
 import com.wishlist.app.ui.screens.SignInScreen
-import com.wishlist.app.ui.screens.WishlistListScreen
+import com.wishlist.app.ui.screens.WishlistTableScreen
 
 @Composable
 fun WishlistRoot(viewModel: WishlistViewModel = viewModel()) {
@@ -31,21 +31,20 @@ fun WishlistRoot(viewModel: WishlistViewModel = viewModel()) {
         return
     }
 
-    WishlistListScreen(
+    WishlistTableScreen(
         uiState = uiState,
         onShowCompletedChange = viewModel::onShowCompletedChange,
-        onSortFieldSelected = { group, field ->
-            viewModel.onSortChange(group.categoryKey, field, group.sortField, group.ascending)
+        onSortSelected = viewModel::onSortSelected,
+        onToggleRowDone = { row ->
+            // A row backed by a 세부항목 ticks that step; an item with none ticks the item itself.
+            if (row.subIndex >= 0) {
+                viewModel.toggleSubItem(row.item, row.subIndex)
+            } else {
+                viewModel.toggleItemDone(row.item)
+            }
         },
-        onToggleDirection = { group ->
-            viewModel.onSortChange(group.categoryKey, group.sortField, group.sortField, group.ascending)
-        },
-        onToggleSubItem = viewModel::toggleSubItem,
-        onMoveSubItem = viewModel::moveSubItem,
-        onReorder = viewModel::applyManualOrder,
-        onReorderGroups = viewModel::applyGroupOrder,
-        onItemClick = { item ->
-            editingItem = item
+        onRowClick = { row ->
+            editingItem = row.item
             showAddEdit = true
         },
         onAddClick = {

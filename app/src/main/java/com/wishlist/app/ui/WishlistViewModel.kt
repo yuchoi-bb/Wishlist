@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -31,7 +32,7 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
     // FirebaseFirestore.getInstance() throws IllegalStateException in that case.
     private val firestoreRepository = runCatching { FirebaseFirestore.getInstance() }.getOrNull()
         ?.let { FirestoreWishlistRepository(it) }
-    private val repository = WishlistRepository(firestoreRepository, db.categorySortPrefDao())
+    private val repository = WishlistRepository(firestoreRepository, db.sortPreferenceDao())
 
     private val showCompleted = MutableStateFlow(false)
 
@@ -42,13 +43,16 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
                 flowOf(WishlistUiState(isLoading = false))
             } else {
                 combine(
-                    repository.observeGroups(uid, showCompleted),
+                    repository.observeRows(uid, showCompleted),
+                    repository.observeSortPreference(),
                     showCompleted,
-                ) { groups, includeCompleted ->
+                ) { rows, preference, includeCompleted ->
                     WishlistUiState(
-                        groups = groups,
+                        rows = rows,
+                        sortField = preference.sortField,
+                        ascending = preference.ascending,
                         showCompleted = includeCompleted,
-                        majorCategories = groups.mapNotNull { it.majorCategory }.distinct().sorted(),
+                        majorCategories = rows.mapNotNull { it.item.majorCategory }.distinct().sorted(),
                         isLoading = false,
                     )
                 }
@@ -60,11 +64,12 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
         showCompleted.value = show
     }
 
-    /** Tapping the same field again flips direction; tapping a different field switches to it (ascending). */
-    fun onSortChange(categoryKey: String, field: SortField, currentField: SortField, currentAscending: Boolean) {
-        val newAscending = if (field == currentField) !currentAscending else true
+    /** Choosing the field already in use flips direction; a different field starts ascending. */
+    fun onSortSelected(field: SortField) {
         viewModelScope.launch {
-            repository.setSortForCategory(categoryKey, field, newAscending)
+            val current = repository.observeSortPreference().first()
+            val ascending = if (current.sortField == field) !current.ascending else true
+            repository.setSort(field, ascending)
         }
     }
 
@@ -83,9 +88,6 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { repository.deleteItem(uid, item) }
     }
 
-    // Completion is set by editing an item's 완료일 in the dialog, which goes through saveItem —
-    // there is no longer a one-tap complete control on the list.
-
     fun toggleSubItem(item: WishlistItem, index: Int) {
         val uid = authManager.currentUser.value?.uid ?: return
         val subItem = item.subItems.getOrNull(index) ?: return
@@ -93,21 +95,9 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { repository.updateSubItems(uid, item, updated) }
     }
 
-    fun moveSubItem(item: WishlistItem, from: Int, to: Int) {
+    /** For the item-only row, where there is no 세부항목 to tick. */
+    fun toggleItemDone(item: WishlistItem) {
         val uid = authManager.currentUser.value?.uid ?: return
-        if (from !in item.subItems.indices || to !in item.subItems.indices) return
-        val updated = item.subItems.toMutableList().apply { add(to, removeAt(from)) }
-        viewModelScope.launch { repository.updateSubItems(uid, item, updated) }
-    }
-
-    /** Commits a finished drag: stores the new ranks and pins that group to 직접 지정 order. */
-    fun applyManualOrder(categoryKey: String, orderedIds: List<String>) {
-        val uid = authManager.currentUser.value?.uid ?: return
-        viewModelScope.launch { repository.applyManualOrder(uid, categoryKey, orderedIds) }
-    }
-
-    /** Commits a finished header drag: the new top-to-bottom order of the category groups. */
-    fun applyGroupOrder(orderedCategoryKeys: List<String>) {
-        viewModelScope.launch { repository.applyGroupOrder(orderedCategoryKeys) }
+        viewModelScope.launch { repository.saveItem(uid, item.copy(isDone = !item.isDone)) }
     }
 }
