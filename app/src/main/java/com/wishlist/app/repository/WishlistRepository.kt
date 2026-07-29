@@ -69,12 +69,14 @@ class WishlistRepository(
      * (완료예정일, 세부항목 이름) orders the rows individually, which is what makes it possible to see
      * every step across the whole list by its due date.
      */
-    fun observeRows(uid: String, showCompleted: Flow<Boolean>): Flow<List<TableRow>> =
+    fun observeRows(uid: String, hideCompleted: Flow<Boolean>): Flow<List<TableRow>> =
         combine(
             itemsFlow(uid),
             observeSortPreference(),
-            showCompleted,
-        ) { items, preference, includeCompleted ->
+            hideCompleted,
+        ) { items, preference, hideDone ->
+            // Completed lines stay in the table struck through by default; hiding them is opt-in.
+            val includeCompleted = !hideDone
             if (preference.sortField.keepsItemTogether) {
                 groupedRows(items, preference, includeCompleted)
             } else {

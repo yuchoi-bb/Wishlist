@@ -33,7 +33,7 @@ fun WishlistRoot(viewModel: WishlistViewModel = viewModel()) {
 
     WishlistTableScreen(
         uiState = uiState,
-        onShowCompletedChange = viewModel::onShowCompletedChange,
+        onHideCompletedChange = viewModel::onHideCompletedChange,
         onSortSelected = viewModel::onSortSelected,
         onToggleRowDone = { row ->
             // A row backed by a 세부항목 ticks that step; an item with none ticks the item itself.

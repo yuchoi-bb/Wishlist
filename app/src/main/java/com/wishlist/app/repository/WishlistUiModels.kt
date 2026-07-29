@@ -39,8 +39,8 @@ data class WishlistUiState(
     val rows: List<TableRow> = emptyList(),
     val sortField: SortField = SortField.END_DATE,
     val ascending: Boolean = true,
-    /** Completed rows stay in the table but are hidden until the user asks to see them. */
-    val showCompleted: Boolean = false,
+    /** Completed lines stay visible with a strikethrough unless the user asks to hide them. */
+    val hideCompleted: Boolean = false,
     val majorCategories: List<String> = emptyList(),
     /** Colors the user picked per 대분류/중분류; anything not listed falls back to an automatic one. */
     val categoryColors: List<CategoryColorPref> = emptyList(),

@@ -35,7 +35,9 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
         ?.let { FirestoreWishlistRepository(it) }
     private val repository = WishlistRepository(firestoreRepository, db.sortPreferenceDao())
 
-    private val showCompleted = MutableStateFlow(false)
+    // Off by default: a finished 할 일 stays on screen with a line through it until the user
+    // decides they don't want to see it any more.
+    private val hideCompleted = MutableStateFlow(false)
 
     val uiState: StateFlow<WishlistUiState> = authManager.currentUser
         .flatMapLatest { user ->
@@ -44,17 +46,17 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
                 flowOf(WishlistUiState(isLoading = false))
             } else {
                 combine(
-                    repository.observeRows(uid, showCompleted),
+                    repository.observeRows(uid, hideCompleted),
                     repository.observeSortPreference(),
-                    showCompleted,
+                    hideCompleted,
                     repository.observeCategoryColors(uid),
                     repository.observeSyncError(),
-                ) { rows, preference, includeCompleted, colors, syncError ->
+                ) { rows, preference, hideDone, colors, syncError ->
                     WishlistUiState(
                         rows = rows,
                         sortField = preference.sortField,
                         ascending = preference.ascending,
-                        showCompleted = includeCompleted,
+                        hideCompleted = hideDone,
                         majorCategories = rows.mapNotNull { it.item.majorCategory }.distinct().sorted(),
                         categoryColors = colors,
                         syncError = syncError,
@@ -65,8 +67,8 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), WishlistUiState())
 
-    fun onShowCompletedChange(show: Boolean) {
-        showCompleted.value = show
+    fun onHideCompletedChange(hide: Boolean) {
+        hideCompleted.value = hide
     }
 
     /** Choosing the field already in use flips direction; a different field starts ascending. */

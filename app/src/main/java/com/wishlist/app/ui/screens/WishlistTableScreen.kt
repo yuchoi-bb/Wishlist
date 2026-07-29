@@ -73,7 +73,7 @@ private val CELL_PADDING = 4.dp
 @Composable
 fun WishlistTableScreen(
     uiState: WishlistUiState,
-    onShowCompletedChange: (Boolean) -> Unit,
+    onHideCompletedChange: (Boolean) -> Unit,
     onSortSelected: (SortField) -> Unit,
     onToggleRowDone: (TableRow) -> Unit,
     onRowClick: (TableRow) -> Unit,
@@ -123,8 +123,8 @@ fun WishlistTableScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Checkbox(checked = uiState.showCompleted, onCheckedChange = onShowCompletedChange)
-                Text("완료된 항목 보기", style = MaterialTheme.typography.bodySmall)
+                Checkbox(checked = uiState.hideCompleted, onCheckedChange = onHideCompletedChange)
+                Text("완료항목 숨기기", style = MaterialTheme.typography.bodySmall)
             }
 
             Column(modifier = Modifier.horizontalScroll(horizontalScroll)) {
