@@ -44,7 +44,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wishlist.app.data.CategoryColorPref
@@ -57,6 +59,12 @@ import com.wishlist.app.ui.theme.CATEGORY_PALETTE
 import com.wishlist.app.ui.theme.categoryColor
 import com.wishlist.app.ui.theme.paletteIndexFor
 import com.wishlist.app.util.todayStartOfDayMillis
+
+/**
+ * 세부항목 text, two points smaller than the 16sp a text field normally uses: a dialog holds a whole
+ * list of them, and the extra room per row is worth more than the size.
+ */
+private val SUB_ITEM_TEXT_STYLE = TextStyle(fontSize = 14.sp)
 
 /**
  * The 항목 editor, and the only place completion and deletion happen. Field order follows the way an
@@ -179,6 +187,7 @@ fun AddEditItemDialog(
                                 onValueChange = { subItems[index] = subItem.copy(title = it) },
                                 modifier = Modifier.weight(1f),
                                 singleLine = true,
+                                textStyle = SUB_ITEM_TEXT_STYLE,
                             )
                             IconButton(onClick = { subItems.removeAt(index) }) {
                                 Icon(Icons.Filled.Close, contentDescription = "세부항목 삭제")
@@ -212,9 +221,11 @@ fun AddEditItemDialog(
                     OutlinedTextField(
                         value = newSubItemTitle,
                         onValueChange = { newSubItemTitle = it },
+                        // Label style left alone so it still shrinks when the field is focused.
                         label = { Text("세부항목 추가") },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
+                        textStyle = SUB_ITEM_TEXT_STYLE,
                     )
                     IconButton(
                         enabled = newSubItemTitle.isNotBlank(),
