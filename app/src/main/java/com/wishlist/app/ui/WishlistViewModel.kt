@@ -35,9 +35,9 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
         ?.let { FirestoreWishlistRepository(it) }
     private val repository = WishlistRepository(firestoreRepository, db.sortPreferenceDao())
 
-    // Off by default: a finished 할 일 stays on screen with a line through it until the user
-    // decides they don't want to see it any more.
-    private val hideCompleted = MutableStateFlow(false)
+    // On by default: what's left to do is what the table is for. Unchecking brings the finished
+    // lines back, struck through, without them ever having been deleted.
+    private val hideCompleted = MutableStateFlow(true)
 
     val uiState: StateFlow<WishlistUiState> = authManager.currentUser
         .flatMapLatest { user ->

@@ -26,6 +26,10 @@ fun todayStartOfDayMillis(): Long = System.currentTimeMillis().toStartOfDayMilli
 fun formatDate(epochMillis: Long): String =
     Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(dateFormatter)
 
+/** Calendar month (1-12) a stored date falls in, in the device's own time zone. */
+fun monthOf(epochMillis: Long): Int =
+    Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).monthValue
+
 /** For things that happen at a moment rather than on a day, e.g. when a backup last ran. */
 fun formatDateTime(epochMillis: Long): String =
     Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(dateTimeFormatter)

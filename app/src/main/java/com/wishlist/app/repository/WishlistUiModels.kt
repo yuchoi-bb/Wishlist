@@ -39,8 +39,8 @@ data class WishlistUiState(
     val rows: List<TableRow> = emptyList(),
     val sortField: SortField = SortField.END_DATE,
     val ascending: Boolean = true,
-    /** Completed lines stay visible with a strikethrough unless the user asks to hide them. */
-    val hideCompleted: Boolean = false,
+    /** Completed lines are hidden by default; unchecking shows them struck through. */
+    val hideCompleted: Boolean = true,
     val majorCategories: List<String> = emptyList(),
     /** Colors the user picked per 대분류/중분류; anything not listed falls back to an automatic one. */
     val categoryColors: List<CategoryColorPref> = emptyList(),
