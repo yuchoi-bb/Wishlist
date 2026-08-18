@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.getValue
@@ -16,8 +17,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.core.content.PermissionChecker
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wishlist.app.CrashLog
 import com.wishlist.app.ui.screens.CrashScreen
+import com.wishlist.app.ui.theme.ThemeMode
+import com.wishlist.app.ui.theme.ThemeSettings
 import com.wishlist.app.ui.theme.WishlistTheme
 import com.wishlist.app.update.AutoUpdater
 
@@ -38,7 +42,15 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            WishlistTheme {
+            val themeSettings = remember { ThemeSettings.get(applicationContext) }
+            val themeMode by themeSettings.mode.collectAsStateWithLifecycle()
+            val darkTheme = when (themeMode) {
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+            }
+
+            WishlistTheme(darkTheme = darkTheme) {
                 val context = LocalContext.current
                 var crash by remember { mutableStateOf(CrashLog.readAndClear(context)) }
 

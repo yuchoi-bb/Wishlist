@@ -39,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -123,6 +124,10 @@ fun WishlistTableScreen(
             // Sorting by 완료예정일 colors each line by its month instead of by (대/중분류): the point
             // of that view is when things are due, so the month is what the eye should group by.
             val colorByMonth = uiState.sortField == SortField.END_DATE
+            // Read from the theme in effect rather than the system setting, since the theme can be
+            // overridden per device in 설정. Tints need both a different color and a heavier alpha
+            // on a dark surface to be told apart at all.
+            val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
 
             Column(modifier = Modifier.fillMaxSize()) {
                 // Sync trouble is shown and worked through, not crashed on: the table still works
@@ -172,8 +177,9 @@ fun WishlistTableScreen(
                                     row = row,
                                     cols = cols,
                                     textStyle = cellStyle,
+                                    dark = dark,
                                     tint = if (colorByMonth) {
-                                        monthColor(row.effectiveEndDate)
+                                        monthColor(row.effectiveEndDate, dark)
                                     } else {
                                         categoryColor(
                                             row.item.majorCategory,
@@ -268,6 +274,7 @@ private fun DataRow(
     /** What this line's color means — its (대/중분류), or the month it's due in. */
     tint: Color?,
     bandCategoryCells: Boolean,
+    dark: Boolean,
     onToggleDone: () -> Unit,
     onClick: () -> Unit,
 ) {
@@ -278,16 +285,19 @@ private fun DataRow(
     val isBlockHead = row.isItemRow && row.grouped
     val weight = if (isBlockHead) FontWeight.SemiBold else FontWeight.Normal
 
-    // Alpha keeps the text readable over the tint in both themes.
+    // Strong enough to tell two tints apart at a glance while leaving the text readable. A dark
+    // surface swallows a translucent color, so it gets more alpha than the light one.
+    val rowAlpha = if (dark) 0.32f else 0.24f
+    val headAlpha = if (dark) 0.46f else 0.38f
     val background = when {
-        tint != null -> tint.copy(alpha = if (isBlockHead) 0.24f else 0.12f)
+        tint != null -> tint.copy(alpha = if (isBlockHead) headAlpha else rowAlpha)
         isBlockHead -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
         else -> Color.Transparent
     }
     // The 대분류/중분류 columns themselves get the stronger tint, so a category color reads as a band
     // down the left of the table rather than a wash over every row.
     val categoryCellBackground = if (bandCategoryCells) {
-        tint?.copy(alpha = 0.4f) ?: Color.Transparent
+        tint?.copy(alpha = if (dark) 0.6f else 0.55f) ?: Color.Transparent
     } else {
         Color.Transparent
     }

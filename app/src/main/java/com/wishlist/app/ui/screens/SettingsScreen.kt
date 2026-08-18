@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +47,8 @@ import com.wishlist.app.auth.AuthManager
 import com.wishlist.app.backup.DriveBackupManager
 import com.wishlist.app.data.FirestoreWishlistRepository
 import com.wishlist.app.data.WishlistDatabase
+import com.wishlist.app.ui.theme.ThemeMode
+import com.wishlist.app.ui.theme.ThemeSettings
 import com.wishlist.app.update.UpdateChecker
 import com.wishlist.app.util.formatDateTime
 import kotlinx.coroutines.launch
@@ -58,6 +61,8 @@ fun SettingsScreen(authManager: AuthManager, onBack: () -> Unit) {
     val firestoreRepository = remember { FirestoreWishlistRepository(FirebaseFirestore.getInstance()) }
     val backupManager = remember { DriveBackupManager(context, database, firestoreRepository) }
     val updateChecker = remember { UpdateChecker(context) }
+    val themeSettings = remember { ThemeSettings.get(context) }
+    val themeMode by themeSettings.mode.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     val currentUser by authManager.currentUser.collectAsStateWithLifecycle()
@@ -102,6 +107,19 @@ fun SettingsScreen(authManager: AuthManager, onBack: () -> Unit) {
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            Text("화면 테마", style = MaterialTheme.typography.titleMedium)
+            // Stored per device: the same account is used on a tablet in dark mode and a phone in
+            // light mode, so this follows the device rather than the person.
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ThemeMode.entries.forEach { mode ->
+                    FilterChip(
+                        selected = themeMode == mode,
+                        onClick = { themeSettings.set(mode) },
+                        label = { Text(mode.label) },
+                    )
+                }
+            }
+
             Text("계정", style = MaterialTheme.typography.titleMedium)
             // Falls back through displayName/uid: email is null unless the sign-in requested it,
             // and a bare "알 수 없음" made a working sign-in look broken.
