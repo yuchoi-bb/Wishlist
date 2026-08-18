@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -54,10 +55,12 @@ import com.wishlist.app.data.SubItem
 import com.wishlist.app.data.WishlistItem
 import com.wishlist.app.ui.WishlistViewModel
 import com.wishlist.app.ui.components.DateField
+import com.wishlist.app.ui.components.DateOnlyPicker
 import com.wishlist.app.ui.components.MonthEndChips
 import com.wishlist.app.ui.theme.CATEGORY_PALETTE
 import com.wishlist.app.ui.theme.categoryColor
 import com.wishlist.app.ui.theme.paletteIndexFor
+import com.wishlist.app.util.formatDate
 import com.wishlist.app.util.todayStartOfDayMillis
 
 /**
@@ -121,7 +124,35 @@ fun AddEditItemDialog(
         remember { mutableStateOf(emptyList<String>()) }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    // Fixed once: a new item's rank is its creation time, and re-reading the clock would make the
+    // item look edited every time the form is compared against its starting state.
+    val position = remember { editingItem?.position ?: System.currentTimeMillis() }
+
+    fun edited() = WishlistItem(
+        id = editingItem?.id ?: "",
+        title = title.trim(),
+        memo = memo.trim().ifBlank { null },
+        subItems = subItems.filter { it.title.isNotBlank() },
+        majorCategory = majorCategory.trim().ifBlank { null },
+        minorCategory = minorCategory.trim().ifBlank { null },
+        startedAt = startedAt,
+        endDate = endDate,
+        isDone = isDone,
+        priority = priority,
+        position = position,
+    )
+
+    // The form as it stood when it opened. Comparing against this — rather than against the stored
+    // item — means the 세부항목 date prefill above doesn't count as an edit the user made.
+    val opened = remember { edited() }
+    var askBeforeLeaving by remember { mutableStateOf(false) }
+
+    /** Back, 취소 and tapping outside all come through here so nothing is lost silently. */
+    val requestDismiss = {
+        if (edited() == opened) onDismiss() else askBeforeLeaving = true
+    }
+
+    Dialog(onDismissRequest = requestDismiss) {
         Surface(shape = MaterialTheme.shapes.large) {
             Column(
                 modifier = Modifier
@@ -173,46 +204,11 @@ fun AddEditItemDialog(
 
                 Text("세부항목", style = MaterialTheme.typography.titleSmall)
                 subItems.forEachIndexed { index, subItem ->
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Checkbox(
-                                checked = subItem.done,
-                                onCheckedChange = { subItems[index] = subItem.copy(done = it) },
-                            )
-                            OutlinedTextField(
-                                value = subItem.title,
-                                onValueChange = { subItems[index] = subItem.copy(title = it) },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                textStyle = SUB_ITEM_TEXT_STYLE,
-                            )
-                            IconButton(onClick = { subItems.removeAt(index) }) {
-                                Icon(Icons.Filled.Close, contentDescription = "세부항목 삭제")
-                            }
-                        }
-                        // Each 세부항목 carries its own deadline; the main table sorts lines by it.
-                        DateField(
-                            label = "세부항목 완료예정일",
-                            epochMillis = subItem.endDate,
-                            emptyLabel = "지정 안 됨",
-                            onValueChange = { subItems[index] = subItem.copy(endDate = it) },
-                            trailingContent = {
-                                if (subItem.endDate != null) {
-                                    TextButton(onClick = { subItems[index] = subItem.copy(endDate = null) }) {
-                                        Text("지우기")
-                                    }
-                                }
-                            },
-                        )
-                        MonthEndChips(
-                            selected = subItem.endDate,
-                            onSelect = { subItems[index] = subItem.copy(endDate = it) },
-                        )
-                        Spacer(Modifier.height(8.dp))
-                    }
+                    SubItemEditor(
+                        subItem = subItem,
+                        onChange = { subItems[index] = it },
+                        onRemove = { subItems.removeAt(index) },
+                    )
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -320,33 +316,103 @@ fun AddEditItemDialog(
                         TextButton(onClick = { onDelete(editingItem) }) { Text("삭제") }
                         Spacer(Modifier.width(8.dp))
                     }
-                    TextButton(onClick = onDismiss) { Text("취소") }
+                    TextButton(onClick = requestDismiss) { Text("취소") }
                     Spacer(Modifier.width(8.dp))
                     TextButton(
                         enabled = title.isNotBlank(),
-                        onClick = {
-                            onSave(
-                                WishlistItem(
-                                    id = editingItem?.id ?: "",
-                                    title = title.trim(),
-                                    memo = memo.trim().ifBlank { null },
-                                    subItems = subItems.filter { it.title.isNotBlank() },
-                                    majorCategory = majorCategory.trim().ifBlank { null },
-                                    minorCategory = minorCategory.trim().ifBlank { null },
-                                    startedAt = startedAt,
-                                    endDate = endDate,
-                                    isDone = isDone,
-                                    priority = priority,
-                                    // A reorder rewrites ranks as 0,1,2…, so a timestamp puts new
-                                    // items after anything already arranged by hand.
-                                    position = editingItem?.position ?: System.currentTimeMillis(),
-                                ),
-                            )
-                        },
+                        onClick = { onSave(edited()) },
                     ) { Text("저장") }
                 }
             }
         }
+    }
+
+    // Declared after the editor so this window sits on top of it.
+    if (askBeforeLeaving) {
+        AlertDialog(
+            // Dismissing the question itself means "keep editing".
+            onDismissRequest = { askBeforeLeaving = false },
+            title = { Text("변경사항을 저장할까요?") },
+            text = { Text("저장하지 않으면 수정한 내용이 사라집니다.") },
+            confirmButton = {
+                TextButton(
+                    enabled = title.isNotBlank(),
+                    onClick = { onSave(edited()) },
+                ) { Text("저장") }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) { Text("저장 안 함") }
+            },
+        )
+    }
+}
+
+/**
+ * One 세부항목, kept to two lines however many of them the 항목 has:
+ *
+ *     [✓] 항목이름                       [✕]
+ *     26.08.31  월말  8말  9말  A말  B말  [✕]
+ *
+ * The second line scrolls sideways, so the date button, the 월말 shortcuts and the clear button
+ * share it instead of stacking into a block per 세부항목.
+ */
+@Composable
+private fun SubItemEditor(
+    subItem: SubItem,
+    onChange: (SubItem) -> Unit,
+    onRemove: () -> Unit,
+) {
+    var showPicker by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Checkbox(
+                checked = subItem.done,
+                onCheckedChange = { onChange(subItem.copy(done = it)) },
+            )
+            OutlinedTextField(
+                value = subItem.title,
+                onValueChange = { onChange(subItem.copy(title = it)) },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                textStyle = SUB_ITEM_TEXT_STYLE,
+            )
+            IconButton(onClick = onRemove) {
+                Icon(Icons.Filled.Close, contentDescription = "세부항목 삭제")
+            }
+        }
+        // Each 세부항목 carries its own 완료예정일; the main table sorts lines by it.
+        MonthEndChips(
+            selected = subItem.endDate,
+            onSelect = { onChange(subItem.copy(endDate = it)) },
+            leadingContent = {
+                TextButton(onClick = { showPicker = true }) {
+                    Text(
+                        text = subItem.endDate?.let(::formatDate) ?: "날짜",
+                        style = SUB_ITEM_TEXT_STYLE,
+                    )
+                }
+            },
+            trailingContent = {
+                if (subItem.endDate != null) {
+                    IconButton(onClick = { onChange(subItem.copy(endDate = null)) }) {
+                        Icon(Icons.Filled.Close, contentDescription = "완료예정일 지우기")
+                    }
+                }
+            },
+        )
+        Spacer(Modifier.height(8.dp))
+    }
+
+    if (showPicker) {
+        DateOnlyPicker(
+            epochMillis = subItem.endDate,
+            onPicked = { onChange(subItem.copy(endDate = it)) },
+            onDismiss = { showPicker = false },
+        )
     }
 }
 

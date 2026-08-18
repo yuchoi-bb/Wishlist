@@ -3,6 +3,7 @@ package com.wishlist.app.ui.components
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
@@ -25,12 +26,16 @@ fun MonthEndChips(
     selected: Long?,
     onSelect: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    /** Put on the same scrolling line as the chips — used to keep a 세부항목 down to two lines. */
+    leadingContent: @Composable RowScope.() -> Unit = {},
+    trailingContent: @Composable RowScope.() -> Unit = {},
 ) {
     Row(
         modifier = modifier.horizontalScroll(rememberScrollState()),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        leadingContent()
         MONTH_OFFSETS.forEach { offset ->
             val millis = endOfMonthMillis(offset)
             FilterChip(
@@ -39,5 +44,6 @@ fun MonthEndChips(
                 label = { Text(monthEndLabel(offset)) },
             )
         }
+        trailingContent()
     }
 }

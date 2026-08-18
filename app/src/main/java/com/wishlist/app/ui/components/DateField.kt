@@ -55,32 +55,51 @@ fun DateField(
     }
 
     if (showPicker) {
-        val zone = ZoneId.systemDefault()
-        val initialLocalDate = Instant.ofEpochMilli(epochMillis ?: System.currentTimeMillis())
-            .atZone(zone)
-            .toLocalDate()
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = initialLocalDate
-                .atStartOfDay(ZoneId.of("UTC"))
-                .toInstant()
-                .toEpochMilli(),
+        DateOnlyPicker(
+            epochMillis = epochMillis,
+            onPicked = onValueChange,
+            onDismiss = { showPicker = false },
         )
-        DatePickerDialog(
-            onDismissRequest = { showPicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { selected ->
-                        val date = Instant.ofEpochMilli(selected).atZone(ZoneId.of("UTC")).toLocalDate()
-                        onValueChange(date.atStartOfDay(zone).toInstant().toEpochMilli())
-                    }
-                    showPicker = false
-                }) { Text("확인") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPicker = false }) { Text("취소") }
-            },
-        ) {
-            DatePicker(state = datePickerState)
-        }
+    }
+}
+
+/**
+ * The calendar itself, split out so a compact caller can trigger it from its own button. Works in
+ * UTC internally — Material3's DatePicker reports UTC-midnight millis — and converts the chosen
+ * calendar date back to local start-of-day before handing it out.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DateOnlyPicker(
+    epochMillis: Long?,
+    onPicked: (Long) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val zone = ZoneId.systemDefault()
+    val initialLocalDate = Instant.ofEpochMilli(epochMillis ?: System.currentTimeMillis())
+        .atZone(zone)
+        .toLocalDate()
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = initialLocalDate
+            .atStartOfDay(ZoneId.of("UTC"))
+            .toInstant()
+            .toEpochMilli(),
+    )
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = {
+                datePickerState.selectedDateMillis?.let { selected ->
+                    val date = Instant.ofEpochMilli(selected).atZone(ZoneId.of("UTC")).toLocalDate()
+                    onPicked(date.atStartOfDay(zone).toInstant().toEpochMilli())
+                }
+                onDismiss()
+            }) { Text("확인") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("취소") }
+        },
+    ) {
+        DatePicker(state = datePickerState)
     }
 }
