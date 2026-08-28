@@ -1,6 +1,7 @@
 package com.wishlist.app.ui
 
 import android.Manifest
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -19,6 +20,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.PermissionChecker
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wishlist.app.CrashLog
+import com.wishlist.app.share.SharedDraft
+import com.wishlist.app.share.toSharedDraft
 import com.wishlist.app.ui.screens.CrashScreen
 import com.wishlist.app.ui.theme.ThemeMode
 import com.wishlist.app.ui.theme.ThemeSettings
@@ -30,8 +33,18 @@ class MainActivity : ComponentActivity() {
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
+    /** Set when another app shared something into Wishlist; the editor opens filled in from it. */
+    private var sharedDraft by mutableStateOf<SharedDraft?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        sharedDraft = intent.toSharedDraft(this)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        sharedDraft = intent?.toSharedDraft(this)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
@@ -67,7 +80,10 @@ class MainActivity : ComponentActivity() {
                             // crashed.
                             CrashScreen(crash = crash!!, onDismiss = { crash = null })
                         } else {
-                            WishlistRoot()
+                            WishlistRoot(
+                                sharedDraft = sharedDraft,
+                                onSharedDraftHandled = { sharedDraft = null },
+                            )
                         }
                     }
                 }

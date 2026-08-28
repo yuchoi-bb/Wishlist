@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
@@ -45,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,6 +55,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wishlist.app.data.CategoryColorPref
 import com.wishlist.app.data.SubItem
 import com.wishlist.app.data.WishlistItem
+import com.wishlist.app.share.addToCalendar
 import com.wishlist.app.ui.WishlistViewModel
 import com.wishlist.app.ui.components.DateField
 import com.wishlist.app.ui.components.DateOnlyPicker
@@ -84,6 +87,7 @@ fun AddEditItemDialog(
     onSave: (WishlistItem) -> Unit,
     onDelete: (WishlistItem) -> Unit,
 ) {
+    val context = LocalContext.current
     var title by remember { mutableStateOf(editingItem?.title.orEmpty()) }
     var memo by remember { mutableStateOf(editingItem?.memo.orEmpty()) }
     var majorCategory by remember { mutableStateOf(editingItem?.majorCategory.orEmpty()) }
@@ -124,9 +128,11 @@ fun AddEditItemDialog(
         remember { mutableStateOf(emptyList<String>()) }
     }
 
+    val isNewItem = editingItem?.id.isNullOrBlank()
+
     // Fixed once: a new item's rank is its creation time, and re-reading the clock would make the
     // item look edited every time the form is compared against its starting state.
-    val position = remember { editingItem?.position ?: System.currentTimeMillis() }
+    val position = remember { editingItem?.position?.takeIf { it > 0 } ?: System.currentTimeMillis() }
 
     fun edited() = WishlistItem(
         id = editingItem?.id ?: "",
@@ -160,7 +166,9 @@ fun AddEditItemDialog(
                     .verticalScroll(rememberScrollState()),
             ) {
                 Text(
-                    text = if (editingItem == null) "새 할 일" else "할 일 수정",
+                    // A draft from another app's share arrives as an item with no id yet, so it's
+                    // the id — not the presence of an item — that says whether this is new.
+                    text = if (isNewItem) "새 할 일" else "할 일 수정",
                     style = MaterialTheme.typography.titleLarge,
                 )
                 Spacer(Modifier.height(12.dp))
@@ -196,6 +204,18 @@ fun AddEditItemDialog(
                     trailingContent = {
                         if (endDate != null) {
                             TextButton(onClick = { endDate = null }) { Text("지우기") }
+                            // Opens the calendar app's new-event screen filled in; the user picks
+                            // which calendar and confirms, so Wishlist needs no calendar permission.
+                            TextButton(
+                                enabled = title.isNotBlank(),
+                                onClick = {
+                                    context.addToCalendar(
+                                        title = title.trim(),
+                                        description = memo.trim(),
+                                        dateMillis = endDate!!,
+                                    )
+                                },
+                            ) { Text("캘린더 등록") }
                         }
                     },
                 )
@@ -206,6 +226,7 @@ fun AddEditItemDialog(
                 subItems.forEachIndexed { index, subItem ->
                     SubItemEditor(
                         subItem = subItem,
+                        parentTitle = title,
                         onChange = { subItems[index] = it },
                         onRemove = { subItems.removeAt(index) },
                     )
@@ -312,7 +333,7 @@ fun AddEditItemDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                 ) {
-                    if (editingItem != null) {
+                    if (editingItem != null && !isNewItem) {
                         TextButton(onClick = { onDelete(editingItem) }) { Text("삭제") }
                         Spacer(Modifier.width(8.dp))
                     }
@@ -359,9 +380,12 @@ fun AddEditItemDialog(
 @Composable
 private fun SubItemEditor(
     subItem: SubItem,
+    /** Prefixes the calendar event, so "장보기" from "생일 준비" doesn't lose its context. */
+    parentTitle: String,
     onChange: (SubItem) -> Unit,
     onRemove: () -> Unit,
 ) {
+    val context = LocalContext.current
     var showPicker by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -397,7 +421,22 @@ private fun SubItemEditor(
                 }
             },
             trailingContent = {
-                if (subItem.endDate != null) {
+                val due = subItem.endDate
+                if (due != null) {
+                    IconButton(
+                        enabled = subItem.title.isNotBlank(),
+                        onClick = {
+                            context.addToCalendar(
+                                title = listOf(parentTitle.trim(), subItem.title.trim())
+                                    .filter { it.isNotBlank() }
+                                    .joinToString(" - "),
+                                description = null,
+                                dateMillis = due,
+                            )
+                        },
+                    ) {
+                        Icon(Icons.Filled.Event, contentDescription = "캘린더에 등록")
+                    }
                     IconButton(onClick = { onChange(subItem.copy(endDate = null)) }) {
                         Icon(Icons.Filled.Close, contentDescription = "완료예정일 지우기")
                     }
