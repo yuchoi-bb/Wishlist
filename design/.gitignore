@@ -1,0 +1,3 @@
+# The published canvas is a 2.5 MB build artifact — it's regenerated from the
+# .dc.html sources and canvas.json next to it, and lives at its artifact URL.
+wishlist-screen-design.html
