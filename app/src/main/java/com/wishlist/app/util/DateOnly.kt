@@ -26,6 +26,12 @@ fun todayStartOfDayMillis(): Long = System.currentTimeMillis().toStartOfDayMilli
 fun formatDate(epochMillis: Long): String =
     Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(dateFormatter)
 
+/** "2026 · 08" — the band a month-grouped view puts above a run of rows. */
+fun formatYearMonth(epochMillis: Long): String {
+    val date = Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+    return "%d · %02d".format(date.year, date.monthValue)
+}
+
 /** Calendar month (1-12) a stored date falls in, in the device's own time zone. */
 fun monthOf(epochMillis: Long): Int =
     Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).monthValue
@@ -64,13 +70,18 @@ fun monthEndLabel(monthsAhead: Int, now: Long = System.currentTimeMillis()): Str
     return "${symbol}말"
 }
 
-/** Countdown to a 종료일: "D-3" with days to go, "D-DAY" today, "D+2" once it's past. */
-fun formatRemainingDays(endDate: Long?, now: Long = System.currentTimeMillis()): String {
-    if (endDate == null) return "-"
+/** Whole days from today to [endDate] — negative once the date has passed. */
+fun daysUntil(endDate: Long, now: Long = System.currentTimeMillis()): Long {
     val zone = ZoneId.systemDefault()
     val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
     val target = Instant.ofEpochMilli(endDate).atZone(zone).toLocalDate()
-    val days = ChronoUnit.DAYS.between(today, target)
+    return ChronoUnit.DAYS.between(today, target)
+}
+
+/** Countdown to a 종료일: "D-3" with days to go, "D-DAY" today, "D+2" once it's past. */
+fun formatRemainingDays(endDate: Long?, now: Long = System.currentTimeMillis()): String {
+    if (endDate == null) return "-"
+    val days = daysUntil(endDate, now)
     return when {
         days > 0 -> "D-$days"
         days == 0L -> "D-DAY"

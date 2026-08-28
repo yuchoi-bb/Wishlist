@@ -23,8 +23,8 @@ import com.wishlist.app.CrashLog
 import com.wishlist.app.share.SharedDraft
 import com.wishlist.app.share.toSharedDraft
 import com.wishlist.app.ui.screens.CrashScreen
+import com.wishlist.app.ui.theme.DeviceSettings
 import com.wishlist.app.ui.theme.ThemeMode
-import com.wishlist.app.ui.theme.ThemeSettings
 import com.wishlist.app.ui.theme.WishlistTheme
 import com.wishlist.app.update.AutoUpdater
 
@@ -55,8 +55,8 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            val themeSettings = remember { ThemeSettings.get(applicationContext) }
-            val themeMode by themeSettings.mode.collectAsStateWithLifecycle()
+            val deviceSettings = remember { DeviceSettings.get(applicationContext) }
+            val themeMode by deviceSettings.themeMode.collectAsStateWithLifecycle()
             val darkTheme = when (themeMode) {
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
                 ThemeMode.LIGHT -> false

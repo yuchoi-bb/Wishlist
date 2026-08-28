@@ -27,6 +27,17 @@ enum class SortField {
     START_DATE,
     ;
 
+    /** What this field is called on screen — in the sort menu and in the table's header. */
+    val label: String
+        get() = when (this) {
+            END_DATE -> "예정일"
+            SUB_ITEM -> "세부항목"
+            CATEGORY -> "대/중분류"
+            TITLE -> "할 일"
+            PRIORITY -> "순위"
+            START_DATE -> "시작일"
+        }
+
     /**
      * True when this field belongs to the 항목 rather than to a single 세부항목, meaning the item is
      * moved as one block and its 세부항목 follow it in their own order.

@@ -3,7 +3,6 @@ package com.wishlist.app.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -11,35 +10,24 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -49,8 +37,9 @@ import androidx.compose.ui.unit.dp
 import com.wishlist.app.data.SortField
 import com.wishlist.app.repository.TableRow
 import com.wishlist.app.repository.WishlistUiState
-import com.wishlist.app.ui.theme.categoryColor
-import com.wishlist.app.ui.theme.monthColor
+import com.wishlist.app.ui.theme.dueColors
+import com.wishlist.app.ui.theme.dueStateOf
+import com.wishlist.app.ui.theme.priorityColors
 import com.wishlist.app.util.formatDate
 import com.wishlist.app.util.formatRemainingDays
 
@@ -63,7 +52,9 @@ import com.wishlist.app.util.formatRemainingDays
  * the caller clamps the scale to 1 there and nothing about the phone layout changes.
  */
 private class Columns(val scale: Float) {
-    val major = 52.dp * scale
+    /** The color rail is carved out of the first column, so the grid keeps its total width. */
+    val rail = 3.dp
+    val major = 52.dp * scale - rail
     val minor = 52.dp * scale
     val title = 100.dp * scale
     val subItem = 124.dp * scale
@@ -74,6 +65,8 @@ private class Columns(val scale: Float) {
 
     /** Breathing room inside a cell; the grid is dense on purpose. */
     val cellPadding = 4.dp * scale
+
+    val total: Dp = rail + major + minor + title + subItem + endDate + remaining + priority + done
 }
 
 /** Sum of the base column widths — what the grid needs before any stretching. */
@@ -82,119 +75,75 @@ private val BASE_TABLE_WIDTH = 548.dp
 /** Text grows with the columns, but far more slowly: past this it just wastes the space again. */
 private const val MAX_TEXT_SCALE = 1.25f
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * The 표 view: one line per 세부항목 across eight columns, scrolled sideways under a header whose
+ * columns sort when tapped. Runs of lines that share a month (under a 예정일 sort) or a (대/중분류)
+ * carry a band above them, and every line carries that group's color as a rail down its left edge —
+ * a rail reads at the same strength in both themes, which a wash over the row does not.
+ */
 @Composable
 fun WishlistTableScreen(
     uiState: WishlistUiState,
-    onHideCompletedChange: (Boolean) -> Unit,
+    dark: Boolean,
     onSortSelected: (SortField) -> Unit,
     onToggleRowDone: (TableRow) -> Unit,
     onRowClick: (TableRow) -> Unit,
-    onAddClick: () -> Unit,
-    onSettingsClick: () -> Unit,
 ) {
     // One shared scroll state: the header must slide with the rows or the columns stop matching.
     val horizontalScroll = rememberScrollState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Wishlist") },
-                actions = {
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Filled.Settings, contentDescription = "설정")
-                    }
-                },
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        // Stretch to fill a tablet, never squeeze below the phone-sized grid.
+        val cols = Columns((maxWidth / BASE_TABLE_WIDTH).coerceAtLeast(1f))
+        val cellStyle = MaterialTheme.typography.bodySmall.let { style ->
+            style.copy(fontSize = style.fontSize * cols.scale.coerceAtMost(MAX_TEXT_SCALE))
+        }
+        val sections = uiState.rows.sectionsFor(uiState.sortField, uiState.categoryColors, dark)
+
+        Column(modifier = Modifier.horizontalScroll(horizontalScroll)) {
+            HeaderRow(
+                cols = cols,
+                sortField = uiState.sortField,
+                ascending = uiState.ascending,
+                onSortSelected = onSortSelected,
             )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onAddClick,
-                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text("할 일 추가") },
-            )
-        },
-    ) { padding ->
-        BoxWithConstraints(modifier = Modifier.padding(padding).fillMaxSize()) {
-            // Stretch to fill a tablet, never squeeze below the phone-sized grid.
-            val cols = Columns((maxWidth / BASE_TABLE_WIDTH).coerceAtLeast(1f))
-            val cellStyle = MaterialTheme.typography.bodySmall.let { style ->
-                style.copy(fontSize = style.fontSize * cols.scale.coerceAtMost(MAX_TEXT_SCALE))
-            }
-            // Sorting by 완료예정일 colors each line by its month instead of by (대/중분류): the point
-            // of that view is when things are due, so the month is what the eye should group by.
-            val colorByMonth = uiState.sortField == SortField.END_DATE
-            // Read from the theme in effect rather than the system setting, since the theme can be
-            // overridden per device in 설정. Tints need both a different color and a heavier alpha
-            // on a dark surface to be told apart at all.
-            val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+            HorizontalDivider()
 
-            Column(modifier = Modifier.fillMaxSize()) {
-                // Sync trouble is shown and worked through, not crashed on: the table still works
-                // from Firestore's local cache while this is up.
-                uiState.syncError?.let { message ->
-                    Surface(color = MaterialTheme.colorScheme.errorContainer) {
-                        SelectionContainer {
-                            Text(
-                                text = message,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                            )
-                        }
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Checkbox(checked = uiState.hideCompleted, onCheckedChange = onHideCompletedChange)
-                    Text("완료항목 숨기기", style = MaterialTheme.typography.bodySmall)
-                }
-
-                Column(modifier = Modifier.horizontalScroll(horizontalScroll)) {
-                    HeaderRow(
-                        cols = cols,
-                        sortField = uiState.sortField,
-                        ascending = uiState.ascending,
-                        onSortSelected = onSortSelected,
-                    )
-                    HorizontalDivider()
-
-                    if (uiState.rows.isEmpty() && !uiState.isLoading) {
-                        Text(
-                            text = "아직 등록된 항목이 없습니다.",
-                            modifier = Modifier.padding(24.dp),
-                        )
-                    } else {
-                        // No fillMaxSize/fillMaxWidth below this point: horizontalScroll hands
-                        // children unbounded width, so the grid sizes itself from the column widths.
-                        LazyColumn {
-                            items(uiState.rows, key = { it.rowKey }) { row ->
-                                DataRow(
-                                    row = row,
-                                    cols = cols,
-                                    textStyle = cellStyle,
-                                    dark = dark,
-                                    tint = if (colorByMonth) {
-                                        monthColor(row.effectiveEndDate, dark)
-                                    } else {
-                                        categoryColor(
-                                            row.item.majorCategory,
-                                            row.item.minorCategory,
-                                            uiState.categoryColors,
-                                        )
-                                    },
-                                    // The 대분류/중분류 band is a category cue; it has no meaning when
-                                    // the color stands for a month.
-                                    bandCategoryCells = !colorByMonth,
-                                    onToggleDone = { onToggleRowDone(row) },
-                                    onClick = { onRowClick(row) },
+            if (uiState.rows.isEmpty() && !uiState.isLoading) {
+                Text(text = "아직 등록된 항목이 없습니다.", modifier = Modifier.padding(24.dp))
+            } else {
+                // No fillMaxSize/fillMaxWidth below this point: horizontalScroll hands children
+                // unbounded width, so the grid sizes itself from the column widths.
+                LazyColumn {
+                    sections.forEach { section ->
+                        if (section.label != null) {
+                            item(key = "section:${section.key}") {
+                                SectionHeader(
+                                    label = section.label,
+                                    count = section.rows.size,
+                                    tint = section.tint,
+                                    modifier = Modifier.width(cols.total),
                                 )
                                 HorizontalDivider()
                             }
+                        }
+                        items(
+                            count = section.rows.size,
+                            key = { index -> section.rows[index].rowKey },
+                        ) { index ->
+                            val row = section.rows[index]
+                            DataRow(
+                                row = row,
+                                cols = cols,
+                                textStyle = cellStyle,
+                                dark = dark,
+                                // Unbanded sorts still get a rail, from the row's own category.
+                                tint = section.tint
+                                    ?: tintFor(uiState.sortField, row, uiState.categoryColors, dark),
+                                onToggleDone = { onToggleRowDone(row) },
+                                onClick = { onRowClick(row) },
+                            )
+                            HorizontalDivider()
                         }
                     }
                 }
@@ -217,7 +166,7 @@ private fun HeaderRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // 대분류 and 중분류 sort as a single unit, so they share one header spanning both columns.
-        HeaderCell("대/중분류", cols.major + cols.minor, cols, SortField.CATEGORY, sortField, ascending, onSortSelected)
+        HeaderCell("대/중분류", cols.rail + cols.major + cols.minor, cols, SortField.CATEGORY, sortField, ascending, onSortSelected)
         HeaderCell("할 일", cols.title, cols, SortField.TITLE, sortField, ascending, onSortSelected)
         HeaderCell("세부항목", cols.subItem, cols, SortField.SUB_ITEM, sortField, ascending, onSortSelected)
         HeaderCell("예정일", cols.endDate, cols, SortField.END_DATE, sortField, ascending, onSortSelected)
@@ -253,6 +202,11 @@ private fun HeaderCell(
             text = label,
             style = labelStyle,
             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+            color = if (isActive) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -260,6 +214,7 @@ private fun HeaderCell(
             Icon(
                 imageVector = if (ascending) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
                 contentDescription = if (ascending) "오름차순" else "내림차순",
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.width(14.dp * cols.scale.coerceAtMost(MAX_TEXT_SCALE)),
             )
         }
@@ -271,9 +226,8 @@ private fun DataRow(
     row: TableRow,
     cols: Columns,
     textStyle: TextStyle,
-    /** What this line's color means — its (대/중분류), or the month it's due in. */
+    /** The group's color — its (대/중분류), or the month it's due in. */
     tint: Color?,
-    bandCategoryCells: Boolean,
     dark: Boolean,
     onToggleDone: () -> Unit,
     onClick: () -> Unit,
@@ -284,33 +238,28 @@ private fun DataRow(
     val isChild = row.grouped && !row.isItemRow
     val isBlockHead = row.isItemRow && row.grouped
     val weight = if (isBlockHead) FontWeight.SemiBold else FontWeight.Normal
-
-    // Strong enough to tell two tints apart at a glance while leaving the text readable. A dark
-    // surface swallows a translucent color, so it gets more alpha than the light one.
-    val rowAlpha = if (dark) 0.32f else 0.24f
-    val headAlpha = if (dark) 0.46f else 0.38f
-    val background = when {
-        tint != null -> tint.copy(alpha = if (isBlockHead) headAlpha else rowAlpha)
-        isBlockHead -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    // Light enough to read text over — the rail carries the color, this only ties the row to it.
+    val wash = when {
+        tint != null && isBlockHead -> tint.copy(alpha = if (dark) 0.22f else 0.16f)
+        tint != null -> tint.copy(alpha = if (dark) 0.10f else 0.07f)
         else -> Color.Transparent
-    }
-    // The 대분류/중분류 columns themselves get the stronger tint, so a category color reads as a band
-    // down the left of the table rather than a wash over every row.
-    val categoryCellBackground = if (bandCategoryCells) {
-        tint?.copy(alpha = if (dark) 0.6f else 0.55f) ?: Color.Transparent
-    } else {
-        Color.Transparent
     }
 
     Row(
         // IntrinsicSize.Min gives the row a bounded height inside the LazyColumn, which is what lets
-        // the tinted category cells fill it instead of collapsing to the height of their text.
+        // the rail fill it instead of collapsing to the height of the text.
         modifier = Modifier
             .height(IntrinsicSize.Min)
-            .background(background)
+            .background(wash)
             .padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Box(
+            modifier = Modifier
+                .width(cols.rail)
+                .fillMaxHeight()
+                .background(tint ?: Color.Transparent),
+        )
         // Everything except the done checkbox opens the editor, which always shows the whole 항목
         // together with its 세부항목 — tapping a child line edits its parent.
         Cell(
@@ -321,7 +270,6 @@ private fun DataRow(
             strike = strike,
             onClick = onClick,
             weight = weight,
-            background = categoryCellBackground,
         )
         Cell(
             text = if (isChild) "" else row.item.minorCategory.orEmpty(),
@@ -330,8 +278,7 @@ private fun DataRow(
             textStyle = textStyle,
             strike = strike,
             onClick = onClick,
-            weight = weight,
-            background = categoryCellBackground,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Cell(
             text = if (isChild) "" else row.item.title,
@@ -359,23 +306,22 @@ private fun DataRow(
             strike = strike,
             onClick = onClick,
         )
-        Cell(
-            text = if (row.isDone) "완료" else formatRemainingDays(row.effectiveEndDate),
+        ChipCell(
             width = cols.remaining,
             cols = cols,
             textStyle = textStyle,
-            strike = strike,
             onClick = onClick,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Cell(
-            text = if (isChild) "" else "${row.item.priority}",
+        ) {
+            DueChip(endDate = row.effectiveEndDate, isDone = row.isDone, dark = dark, style = textStyle)
+        }
+        ChipCell(
             width = cols.priority,
             cols = cols,
             textStyle = textStyle,
-            strike = strike,
             onClick = onClick,
-        )
+        ) {
+            if (!isChild) PriorityChip(priority = row.item.priority, dark = dark, style = textStyle)
+        }
         Box(modifier = Modifier.width(cols.done), contentAlignment = Alignment.Center) {
             Checkbox(checked = row.isDone, onCheckedChange = { onToggleDone() })
         }
@@ -393,6 +339,58 @@ private fun subItemLabel(row: TableRow): String = when {
     else -> "${row.item.doneSubItemCount}/${row.item.subItems.size} 완료"
 }
 
+/** 남은날짜, colored by how close the date is — see [dueStateOf]. */
+@Composable
+fun DueChip(endDate: Long?, isDone: Boolean, dark: Boolean, style: TextStyle) {
+    val colors = dueColors(dueStateOf(endDate, isDone), dark)
+    Text(
+        text = if (isDone) "완료" else formatRemainingDays(endDate),
+        style = style,
+        color = colors.content,
+        fontWeight = FontWeight.Medium,
+        maxLines = 1,
+        modifier = Modifier
+            .background(colors.container, RoundedCornerShape(4.dp))
+            .padding(horizontal = 4.dp, vertical = 1.dp),
+    )
+}
+
+/** 우선순위 as P1/P2/P3 — a number alone in a narrow column read as a count of something. */
+@Composable
+fun PriorityChip(priority: Int, dark: Boolean, style: TextStyle) {
+    val colors = priorityColors(priority, dark)
+    Text(
+        text = "P$priority",
+        style = style,
+        color = colors.content,
+        fontWeight = if (priority == 1) FontWeight.SemiBold else FontWeight.Normal,
+        maxLines = 1,
+        modifier = Modifier
+            .background(colors.container, RoundedCornerShape(4.dp))
+            .padding(horizontal = 4.dp, vertical = 1.dp),
+    )
+}
+
+@Composable
+private fun ChipCell(
+    width: Dp,
+    cols: Columns,
+    textStyle: TextStyle,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .width(width)
+            .fillMaxHeight()
+            .clickable(onClick = onClick)
+            .padding(horizontal = cols.cellPadding),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        content()
+    }
+}
+
 @Composable
 private fun Cell(
     text: String,
@@ -404,13 +402,11 @@ private fun Cell(
     color: Color = MaterialTheme.colorScheme.onSurface,
     weight: FontWeight = FontWeight.Normal,
     indent: Dp = 0.dp,
-    background: Color = Color.Transparent,
 ) {
     Box(
         modifier = Modifier
             .width(width)
             .fillMaxHeight()
-            .background(background)
             .clickable(onClick = onClick)
             .padding(start = cols.cellPadding + indent, end = cols.cellPadding),
         contentAlignment = Alignment.CenterStart,

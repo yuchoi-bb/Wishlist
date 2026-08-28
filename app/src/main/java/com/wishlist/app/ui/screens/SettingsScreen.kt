@@ -47,8 +47,9 @@ import com.wishlist.app.auth.AuthManager
 import com.wishlist.app.backup.DriveBackupManager
 import com.wishlist.app.data.FirestoreWishlistRepository
 import com.wishlist.app.data.WishlistDatabase
+import com.wishlist.app.ui.theme.DeviceSettings
 import com.wishlist.app.ui.theme.ThemeMode
-import com.wishlist.app.ui.theme.ThemeSettings
+import com.wishlist.app.ui.theme.ViewMode
 import com.wishlist.app.update.UpdateChecker
 import com.wishlist.app.util.formatDateTime
 import kotlinx.coroutines.launch
@@ -61,8 +62,9 @@ fun SettingsScreen(authManager: AuthManager, onBack: () -> Unit) {
     val firestoreRepository = remember { FirestoreWishlistRepository(FirebaseFirestore.getInstance()) }
     val backupManager = remember { DriveBackupManager(context, database, firestoreRepository) }
     val updateChecker = remember { UpdateChecker(context) }
-    val themeSettings = remember { ThemeSettings.get(context) }
-    val themeMode by themeSettings.mode.collectAsStateWithLifecycle()
+    val deviceSettings = remember { DeviceSettings.get(context) }
+    val themeMode by deviceSettings.themeMode.collectAsStateWithLifecycle()
+    val viewMode by deviceSettings.viewMode.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     val currentUser by authManager.currentUser.collectAsStateWithLifecycle()
@@ -114,11 +116,24 @@ fun SettingsScreen(authManager: AuthManager, onBack: () -> Unit) {
                 ThemeMode.entries.forEach { mode ->
                     FilterChip(
                         selected = themeMode == mode,
-                        onClick = { themeSettings.set(mode) },
+                        onClick = { deviceSettings.setThemeMode(mode) },
                         label = { Text(mode.label) },
                     )
                 }
             }
+
+            Text("메인 화면", style = MaterialTheme.typography.titleMedium)
+            // Also a one-tap toggle in the app bar; this is where the two are spelled out.
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ViewMode.entries.forEach { mode ->
+                    FilterChip(
+                        selected = viewMode == mode,
+                        onClick = { deviceSettings.setViewMode(mode) },
+                        label = { Text(mode.label) },
+                    )
+                }
+            }
+            Text(viewMode.description, style = MaterialTheme.typography.bodySmall)
 
             Text("계정", style = MaterialTheme.typography.titleMedium)
             // Falls back through displayName/uid: email is null unless the sign-in requested it,

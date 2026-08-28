@@ -35,6 +35,39 @@ data class TableRow(
     val isDone: Boolean get() = item.isDone || (subItem?.done ?: false)
 }
 
+/**
+ * One 항목 with the lines belonging to it, for the list view. [rows] is what survived the current
+ * filter and keeps the order the sort put it in, so hiding completed lines or sorting by 완료예정일
+ * changes what's under an item without a second query.
+ */
+data class ItemGroup(
+    val itemRow: TableRow,
+    val subRows: List<TableRow>,
+) {
+    val item get() = itemRow.item
+    val key: String get() = item.id.ifBlank { itemRow.rowKey }
+
+    /** The date the item as a whole is judged by: its own 최종 종료일, else its earliest step. */
+    val headlineEndDate: Long?
+        get() = item.endDate ?: subRows.mapNotNull { it.effectiveEndDate }.minOrNull()
+}
+
+/**
+ * Collapses table lines back into 항목 blocks, in the order the items first appear. Under a
+ * 세부항목-level sort that means an item ranks by its most urgent step, which is the same order the
+ * table shows, read one level up.
+ */
+fun List<TableRow>.toItemGroups(): List<ItemGroup> {
+    val order = LinkedHashMap<String, MutableList<TableRow>>()
+    forEach { row -> order.getOrPut(row.item.id.ifBlank { row.rowKey }) { mutableListOf() }.add(row) }
+    return order.values.mapNotNull { rows ->
+        // An item line is only emitted by the grouped sorts; otherwise stand one in from a 세부항목
+        // line so the block still has a head to show the 항목's own title and 최종 종료일.
+        val head = rows.firstOrNull { it.isItemRow } ?: rows.firstOrNull() ?: return@mapNotNull null
+        ItemGroup(itemRow = head, subRows = rows.filterNot { it.isItemRow })
+    }
+}
+
 data class WishlistUiState(
     val rows: List<TableRow> = emptyList(),
     val sortField: SortField = SortField.END_DATE,
