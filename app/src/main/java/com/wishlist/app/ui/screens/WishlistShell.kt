@@ -43,8 +43,12 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.wishlist.app.data.SortField
+import com.wishlist.app.repository.TableRow
 import com.wishlist.app.repository.WishlistUiState
+import com.wishlist.app.ui.theme.Serif
 import com.wishlist.app.ui.theme.ViewMode
+import com.wishlist.app.util.daysUntil
+import com.wishlist.app.util.formatToday
 
 /**
  * Everything both main views share: the app bar, the sync banner, the 완료항목 숨기기 switch and the
@@ -70,7 +74,7 @@ fun WishlistShell(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Wishlist") },
+                title = { Text("Wishlist", style = MaterialTheme.typography.titleLarge) },
                 actions = {
                     // One tap to compare the two shapes; 설정 has the same choice spelled out.
                     IconButton(
@@ -118,6 +122,8 @@ fun WishlistShell(
                     }
                 }
             }
+
+            TodayLine(rows = uiState.rows)
 
             Row(
                 modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp),
@@ -248,3 +254,56 @@ fun SectionHeader(
         )
     }
 }
+
+/**
+ * The line the app opens with: today's date, then what today and this week actually ask of you.
+ * Two counts, written out, rather than a row of statistics — the point is to be read in one glance
+ * and then left alone.
+ */
+@Composable
+private fun TodayLine(rows: List<TableRow>) {
+    val counts = remember(rows) {
+        val open = rows.filterNot { it.isDone }
+        val days = open.mapNotNull { row -> row.effectiveEndDate?.let { daysUntil(it) } }
+        // Anything already past counts as today's problem, not a separate number to worry about.
+        days.count { it <= 0L } to days.count { it in 0L..WEEK_DAYS }
+    }
+    val (today, week) = counts
+
+    Column(modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 14.dp)) {
+        Text(
+            text = formatToday(),
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = Serif,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = when {
+                today > 0 -> "오늘까지 ${spellCount(today)}, 이번 주 ${spellCount(week)}."
+                week > 0 -> "이번 주 마감 ${spellCount(week)}."
+                else -> "이번 주 마감은 없습니다."
+            },
+            style = MaterialTheme.typography.displaySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
+}
+
+/** Small counts read better as words; past ten, a figure is clearer than a mouthful. */
+private fun spellCount(count: Int): String = when (count) {
+    0 -> "없음"
+    1 -> "하나"
+    2 -> "둘"
+    3 -> "셋"
+    4 -> "넷"
+    5 -> "다섯"
+    6 -> "여섯"
+    7 -> "일곱"
+    8 -> "여덟"
+    9 -> "아홉"
+    10 -> "열"
+    else -> "${count}개"
+}
+
+private const val WEEK_DAYS = 7L

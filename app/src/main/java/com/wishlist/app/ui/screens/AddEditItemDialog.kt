@@ -169,7 +169,7 @@ fun AddEditItemDialog(
                     // A draft from another app's share arrives as an item with no id yet, so it's
                     // the id — not the presence of an item — that says whether this is new.
                     text = if (isNewItem) "새 할 일" else "할 일 수정",
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.headlineSmall,
                 )
                 Spacer(Modifier.height(12.dp))
 
@@ -182,13 +182,14 @@ fun AddEditItemDialog(
                 )
                 Spacer(Modifier.height(12.dp))
 
-                Text("우선순위", style = MaterialTheme.typography.labelMedium)
+                Text("우선순위", style = MaterialTheme.typography.labelSmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     WishlistItem.PRIORITIES.forEach { value ->
                         FilterChip(
                             selected = priority == value,
                             onClick = { priority = value },
-                            label = { Text("$value") },
+                            // Words, not P1/P2/P3 — the same labels the list shows.
+                            label = { Text(priorityLabel(value)) },
                         )
                     }
                 }

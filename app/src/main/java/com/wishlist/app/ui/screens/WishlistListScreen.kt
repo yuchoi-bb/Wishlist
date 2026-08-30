@@ -1,6 +1,7 @@
 package com.wishlist.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -33,6 +35,7 @@ import com.wishlist.app.repository.ItemGroup
 import com.wishlist.app.repository.TableRow
 import com.wishlist.app.repository.WishlistUiState
 import com.wishlist.app.repository.toItemGroups
+import com.wishlist.app.ui.theme.Serif
 import com.wishlist.app.util.formatDate
 
 /**
@@ -85,7 +88,6 @@ fun WishlistListScreen(
                     onToggleRowDone = onToggleRowDone,
                     onRowClick = onRowClick,
                 )
-                HorizontalDivider()
             }
         }
     }
@@ -103,7 +105,15 @@ private fun ItemBlock(
     val item = group.item
     val strike = if (item.isDone) TextDecoration.LineThrough else null
 
-    Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 5.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .height(IntrinsicSize.Min),
+    ) {
         Box(
             modifier = Modifier
                 .width(3.dp)
@@ -114,7 +124,7 @@ private fun ItemBlock(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { onRowClick(group.itemRow) }
-                .padding(start = 13.dp, end = 16.dp, top = 10.dp, bottom = 12.dp),
+                .padding(start = 14.dp, end = 16.dp, top = 13.dp, bottom = 14.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -129,7 +139,8 @@ private fun ItemBlock(
                 group.headlineEndDate?.let { date ->
                     Text(
                         text = formatDate(date),
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontFamily = Serif,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 8.dp),
                     )
@@ -246,7 +257,8 @@ private fun SubRow(
         row.effectiveEndDate?.let { date ->
             Text(
                 text = formatDate(date),
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = Serif,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textDecoration = strike,
             )

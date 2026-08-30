@@ -3,7 +3,9 @@ package com.wishlist.app.util
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
+import java.util.Locale
 
 // Two-digit year: the table has to fit eight columns on a phone, and the century is never in doubt.
 private val dateFormatter = DateTimeFormatter.ofPattern("yy.MM.dd")
@@ -26,10 +28,17 @@ fun todayStartOfDayMillis(): Long = System.currentTimeMillis().toStartOfDayMilli
 fun formatDate(epochMillis: Long): String =
     Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(dateFormatter)
 
-/** "2026 · 08" — the band a month-grouped view puts above a run of rows. */
+/** "8월 28일 금요일" — today, written the way a person says it. */
+fun formatToday(now: Long = System.currentTimeMillis()): String {
+    val date = Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).toLocalDate()
+    val weekday = date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.KOREAN)
+    return "${date.monthValue}월 ${date.dayOfMonth}일 $weekday"
+}
+
+/** "2026년 8월" — the band a month-grouped view puts above a run of rows. */
 fun formatYearMonth(epochMillis: Long): String {
     val date = Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).toLocalDate()
-    return "%d · %02d".format(date.year, date.monthValue)
+    return "${date.year}년 ${date.monthValue}월"
 }
 
 /** Calendar month (1-12) a stored date falls in, in the device's own time zone. */
@@ -78,13 +87,13 @@ fun daysUntil(endDate: Long, now: Long = System.currentTimeMillis()): Long {
     return ChronoUnit.DAYS.between(today, target)
 }
 
-/** Countdown to a 종료일: "D-3" with days to go, "D-DAY" today, "D+2" once it's past. */
+/** Countdown to a 종료일: "D-3" with days to go, "오늘" on the day, "D+2" once it's past. */
 fun formatRemainingDays(endDate: Long?, now: Long = System.currentTimeMillis()): String {
     if (endDate == null) return "-"
     val days = daysUntil(endDate, now)
     return when {
         days > 0 -> "D-$days"
-        days == 0L -> "D-DAY"
+        days == 0L -> "오늘"
         else -> "D+${-days}"
     }
 }

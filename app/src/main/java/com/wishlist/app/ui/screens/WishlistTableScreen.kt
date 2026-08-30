@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import com.wishlist.app.data.SortField
 import com.wishlist.app.repository.TableRow
 import com.wishlist.app.repository.WishlistUiState
+import com.wishlist.app.ui.theme.Serif
 import com.wishlist.app.ui.theme.dueColors
 import com.wishlist.app.ui.theme.dueStateOf
 import com.wishlist.app.ui.theme.priorityColors
@@ -60,7 +61,7 @@ private class Columns(val scale: Float) {
     val subItem = 124.dp * scale
     val endDate = 80.dp * scale
     val remaining = 56.dp * scale
-    val priority = 40.dp * scale
+    val priority = 48.dp * scale
     val done = 44.dp * scale
 
     /** Breathing room inside a cell; the grid is dense on purpose. */
@@ -70,7 +71,7 @@ private class Columns(val scale: Float) {
 }
 
 /** Sum of the base column widths — what the grid needs before any stretching. */
-private val BASE_TABLE_WIDTH = 548.dp
+private val BASE_TABLE_WIDTH = 556.dp
 
 /** Text grows with the columns, but far more slowly: past this it just wastes the space again. */
 private const val MAX_TEXT_SCALE = 1.25f
@@ -251,7 +252,7 @@ private fun DataRow(
         modifier = Modifier
             .height(IntrinsicSize.Min)
             .background(wash)
-            .padding(vertical = 3.dp),
+            .padding(vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -302,7 +303,8 @@ private fun DataRow(
             text = row.effectiveEndDate?.let { formatDate(it) } ?: "-",
             width = cols.endDate,
             cols = cols,
-            textStyle = textStyle,
+            // The serif is what keeps a column of dates from reading as machine output.
+            textStyle = textStyle.copy(fontFamily = Serif, fontSize = textStyle.fontSize * 1.06f),
             strike = strike,
             onClick = onClick,
         )
@@ -355,12 +357,15 @@ fun DueChip(endDate: Long?, isDone: Boolean, dark: Boolean, style: TextStyle) {
     )
 }
 
-/** 우선순위 as P1/P2/P3 — a number alone in a narrow column read as a count of something. */
+/**
+ * 우선순위 in words. "P1" is how a tracker labels a ticket; 높음/보통/여유 is how someone talks about
+ * their own week, and it costs one column-width to say it that way.
+ */
 @Composable
 fun PriorityChip(priority: Int, dark: Boolean, style: TextStyle) {
     val colors = priorityColors(priority, dark)
     Text(
-        text = "P$priority",
+        text = priorityLabel(priority),
         style = style,
         color = colors.content,
         fontWeight = if (priority == 1) FontWeight.SemiBold else FontWeight.Normal,
@@ -369,6 +374,12 @@ fun PriorityChip(priority: Int, dark: Boolean, style: TextStyle) {
             .background(colors.container, RoundedCornerShape(4.dp))
             .padding(horizontal = 4.dp, vertical = 1.dp),
     )
+}
+
+fun priorityLabel(priority: Int): String = when (priority) {
+    1 -> "높음"
+    2 -> "보통"
+    else -> "여유"
 }
 
 @Composable

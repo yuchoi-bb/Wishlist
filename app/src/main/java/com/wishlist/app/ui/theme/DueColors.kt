@@ -45,52 +45,52 @@ fun dueColors(state: DueState, dark: Boolean): DueColors = when (state) {
     DueState.OVERDUE -> if (dark) {
         DueColors(Color(0xFF4A1D1F), Color(0xFFFF9A9E))
     } else {
-        DueColors(Color(0xFFFDECEC), Color(0xFFB4232A))
+        DueColors(Color(0xFFF7E7E3), Color(0xFFA8443A))
     }
 
     DueState.TODAY -> if (dark) {
         DueColors(Color(0xFF1B5E20), Color(0xFFE8F5E9))
     } else {
-        DueColors(Color(0xFF2E7D32), Color(0xFFFFFFFF))
+        DueColors(Color(0xFF245A28), Color(0xFFFFFFFF))
     }
 
     DueState.SOON -> if (dark) {
         DueColors(Color(0xFF4A3611), Color(0xFFFFCF7A))
     } else {
-        DueColors(Color(0xFFFFF4E5), Color(0xFF9A5B00))
+        DueColors(Color(0xFFF6EBD5), Color(0xFF8A6314))
     }
 
     DueState.LATER -> if (dark) {
         DueColors(Color(0x1FFFFFFF), Color(0xFFB9C0C3))
     } else {
-        DueColors(Color(0xFFF2F4F3), Color(0xFF5B6469))
+        DueColors(Color(0xFFEFEAE0), Color(0xFF5C574E))
     }
 
     DueState.DONE -> if (dark) {
         DueColors(Color.Transparent, Color(0xFF7E878B))
     } else {
-        DueColors(Color.Transparent, Color(0xFFA2AAAE))
+        DueColors(Color.Transparent, Color(0xFFA8A296))
     }
 }
 
-/** 우선순위 chips: P1 carries the brand tint, P2 is quiet, P3 is barely there. */
+/** 우선순위 chips: 높음 carries the brand tint, 보통 is quiet, 여유 is barely there. */
 fun priorityColors(priority: Int, dark: Boolean): DueColors = when (priority) {
     1 -> if (dark) {
         DueColors(Color(0xFF1E3A22), Color(0xFF9CD3A2))
     } else {
-        DueColors(Color(0xFFE8F0E9), Color(0xFF1B5E20))
+        DueColors(Color(0xFFE4EDE4), Color(0xFF245A28))
     }
 
     2 -> if (dark) {
         DueColors(Color(0x1FFFFFFF), Color(0xFFB9C0C3))
     } else {
-        DueColors(Color(0xFFF2F4F3), Color(0xFF5B6469))
+        DueColors(Color(0xFFEFEAE0), Color(0xFF5C574E))
     }
 
     else -> if (dark) {
         DueColors(Color.Transparent, Color(0xFF7E878B))
     } else {
-        DueColors(Color.Transparent, Color(0xFF8A9399))
+        DueColors(Color.Transparent, Color(0xFFA8A296))
     }
 }
 
