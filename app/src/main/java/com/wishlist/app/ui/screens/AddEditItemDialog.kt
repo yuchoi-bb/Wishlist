@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
@@ -56,6 +57,7 @@ import com.wishlist.app.data.CategoryColorPref
 import com.wishlist.app.data.SubItem
 import com.wishlist.app.data.WishlistItem
 import com.wishlist.app.share.addToCalendar
+import com.wishlist.app.share.sendToTaskApp
 import com.wishlist.app.ui.WishlistViewModel
 import com.wishlist.app.ui.components.DateField
 import com.wishlist.app.ui.components.DateOnlyPicker
@@ -165,12 +167,33 @@ fun AddEditItemDialog(
                     .padding(20.dp)
                     .verticalScroll(rememberScrollState()),
             ) {
-                Text(
-                    // A draft from another app's share arrives as an item with no id yet, so it's
-                    // the id — not the presence of an item — that says whether this is new.
-                    text = if (isNewItem) "새 할 일" else "할 일 수정",
-                    style = MaterialTheme.typography.headlineSmall,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        // A draft from another app's share arrives as an item with no id yet, so
+                        // it's the id — not the presence of an item — that says whether this is new.
+                        text = if (isNewItem) "새 할 일" else "할 일 수정",
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    // Hands the 항목 to a to-do app. Up here rather than beside 캘린더 등록 because
+                    // that button belongs to 최종 종료일 and only appears once a date is set, while a
+                    // 할 일 needs nothing but its name to be worth sending.
+                    IconButton(
+                        enabled = title.isNotBlank(),
+                        onClick = {
+                            context.sendToTaskApp(
+                                title = title.trim(),
+                                memo = memo.trim().ifBlank { null },
+                                dateMillis = endDate,
+                            )
+                        },
+                    ) {
+                        Icon(Icons.Filled.Share, contentDescription = "할 일 앱으로 보내기")
+                    }
+                }
                 Spacer(Modifier.height(12.dp))
 
                 OutlinedTextField(
@@ -369,6 +392,12 @@ fun AddEditItemDialog(
     }
 }
 
+/** "생일 준비 - 장보기": a 세부항목 handed to another app carries its 항목 along for context. */
+private fun handoffTitle(parentTitle: String, subItemTitle: String): String =
+    listOf(parentTitle.trim(), subItemTitle.trim())
+        .filter { it.isNotBlank() }
+        .joinToString(" - ")
+
 /**
  * One 세부항목, kept to two lines however many of them the 항목 has:
  *
@@ -381,7 +410,7 @@ fun AddEditItemDialog(
 @Composable
 private fun SubItemEditor(
     subItem: SubItem,
-    /** Prefixes the calendar event, so "장보기" from "생일 준비" doesn't lose its context. */
+    /** Prefixes what gets handed off, so "장보기" from "생일 준비" doesn't lose its context. */
     parentTitle: String,
     onChange: (SubItem) -> Unit,
     onRemove: () -> Unit,
@@ -423,14 +452,26 @@ private fun SubItemEditor(
             },
             trailingContent = {
                 val due = subItem.endDate
+                // Unlike the calendar, a to-do app takes an item with no date at all, so this one
+                // isn't gated on 완료예정일 the way the two below are.
+                IconButton(
+                    enabled = subItem.title.isNotBlank(),
+                    onClick = {
+                        context.sendToTaskApp(
+                            title = handoffTitle(parentTitle, subItem.title),
+                            memo = null,
+                            dateMillis = due,
+                        )
+                    },
+                ) {
+                    Icon(Icons.Filled.Share, contentDescription = "할 일 앱으로 보내기")
+                }
                 if (due != null) {
                     IconButton(
                         enabled = subItem.title.isNotBlank(),
                         onClick = {
                             context.addToCalendar(
-                                title = listOf(parentTitle.trim(), subItem.title.trim())
-                                    .filter { it.isNotBlank() }
-                                    .joinToString(" - "),
+                                title = handoffTitle(parentTitle, subItem.title),
                                 description = null,
                                 dateMillis = due,
                             )

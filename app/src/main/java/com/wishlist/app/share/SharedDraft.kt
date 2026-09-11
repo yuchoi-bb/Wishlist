@@ -35,11 +35,24 @@ fun Intent.toSharedDraft(context: Context): SharedDraft? {
     // A shared event's first line is its title; the rest is when and where, which belongs in 메모.
     val title = subject ?: body!!.lineSequence().first().trim()
     val memo = when {
-        subject != null -> body
+        // A sender that names the item in both the subject and the first line of the body — which
+        // is what Wishlist's own 할 일 앱 handoff does, so that apps reading only one of the two
+        // still get the name — would otherwise leave the title repeated at the top of 메모.
+        subject != null -> body?.withoutTitleLine(subject)
         body!!.lineSequence().count() > 1 -> body.substringAfter('\n').trim().ifBlank { null }
         else -> null
     }
     return SharedDraft(title = title.take(MAX_TITLE), memo = memo, endDate = body?.let(::findDate))
+}
+
+/**
+ * The body with a leading line that just repeats [title] dropped, or null once nothing is left. The
+ * explicit "" fallback matters: [substringAfter] hands back the whole string when the delimiter is
+ * missing, which would keep a one-line body that was only ever the title.
+ */
+private fun String.withoutTitleLine(title: String): String? {
+    val rest = if (lineSequence().first().trim() == title) substringAfter('\n', "") else this
+    return rest.trim().ifBlank { null }
 }
 
 private fun Intent.readStream(context: Context): String? {
