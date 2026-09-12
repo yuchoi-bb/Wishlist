@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The mark is navy on paper, so the icon's ground is paper. -->
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!--
+      Ground for both adaptive icons. minSdk is 26, so mipmap-anydpi-v26 always wins and this colour
+      is the icon's background on every device the app runs on; the legacy ic_launcher*.png bitmaps
+      are never rendered and still carry the old white ground.
+
+      Against the mark's navy (#071C66) this red sits at 2.8:1 — under the 3:1 a shape needs to stay
+      crisp, so the silhouette softens at launcher size. Pushing the ground lighter (#E0693E reaches
+      4.6:1) or repainting the mark cream over a deeper red would both fix it.
+    -->
+    <color name="ic_launcher_background">#C0392B</color>
 </resources>
