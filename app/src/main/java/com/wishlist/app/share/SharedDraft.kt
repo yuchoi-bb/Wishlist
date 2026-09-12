@@ -21,7 +21,7 @@ data class SharedDraft(
  * Calendar apps share an event in one of two shapes: a .ics attachment, which carries the title and
  * date in machine-readable form, or plain text meant for a human. Both are handled — the .ics first
  * because it's exact — and anything else shared as text still becomes an item with the text as its
- * title, which is what makes Wishlist useful from any app's share sheet.
+ * title, which is what makes Arc useful from any app's share sheet.
  */
 fun Intent.toSharedDraft(context: Context): SharedDraft? {
     if (action != Intent.ACTION_SEND) return null
@@ -36,7 +36,7 @@ fun Intent.toSharedDraft(context: Context): SharedDraft? {
     val title = subject ?: body!!.lineSequence().first().trim()
     val memo = when {
         // A sender that names the item in both the subject and the first line of the body — which
-        // is what Wishlist's own 할 일 앱 handoff does, so that apps reading only one of the two
+        // is what Arc's own 할 일 앱 handoff does, so that apps reading only one of the two
         // still get the name — would otherwise leave the title repeated at the top of 메모.
         subject != null -> body?.withoutTitleLine(subject)
         body!!.lineSequence().count() > 1 -> body.substringAfter('\n').trim().ifBlank { null }

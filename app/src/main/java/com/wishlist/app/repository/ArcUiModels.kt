@@ -1,9 +1,9 @@
 package com.wishlist.app.repository
 
+import com.wishlist.app.data.ArcItem
 import com.wishlist.app.data.CategoryColorPref
 import com.wishlist.app.data.SortField
 import com.wishlist.app.data.SubItem
-import com.wishlist.app.data.WishlistItem
 
 /**
  * One line of the main table, and the reason the table can show two shapes at once.
@@ -17,7 +17,7 @@ import com.wishlist.app.data.WishlistItem
  * [subItem] is null on an 항목 line; an item with no 세부항목 at all is always just that one line.
  */
 data class TableRow(
-    val item: WishlistItem,
+    val item: ArcItem,
     val subItem: SubItem?,
     /** Index into the item's subItems, or -1 for the 항목 line. */
     val subIndex: Int,
@@ -68,7 +68,7 @@ fun List<TableRow>.toItemGroups(): List<ItemGroup> {
     }
 }
 
-data class WishlistUiState(
+data class ArcUiState(
     val rows: List<TableRow> = emptyList(),
     val sortField: SortField = SortField.END_DATE,
     val ascending: Boolean = true,

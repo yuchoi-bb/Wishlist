@@ -28,7 +28,10 @@ android {
         // Matches the v1.0.N release tag so UpdateChecker's semver comparison lines up.
         versionName = "1.0.$buildNumber"
 
-        // Owner/repo of the GitHub Releases feed used by the in-app update checker.
+        // Owner/repo of the GitHub Releases feed used by the in-app update checker. The repo
+        // is still named Wishlist though the app is now Arc — this is the URL, not a label, so
+        // it only changes if the repository itself is renamed. Getting it wrong is invisible:
+        // checkForUpdate swallows the 404 and the app simply stops seeing new versions.
         buildConfigField("String", "UPDATE_REPO_OWNER", "\"yuchoi-bb\"")
         buildConfigField("String", "UPDATE_REPO_NAME", "\"Wishlist\"")
     }

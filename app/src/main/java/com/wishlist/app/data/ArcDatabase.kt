@@ -12,18 +12,20 @@ import androidx.room.TypeConverters
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
-abstract class WishlistDatabase : RoomDatabase() {
+abstract class ArcDatabase : RoomDatabase() {
     abstract fun sortPreferenceDao(): SortPreferenceDao
 
     companion object {
         @Volatile
-        private var instance: WishlistDatabase? = null
+        private var instance: ArcDatabase? = null
 
-        fun getInstance(context: Context): WishlistDatabase =
+        fun getInstance(context: Context): ArcDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
-                    WishlistDatabase::class.java,
+                    ArcDatabase::class.java,
+                    // The file already on every device; renaming it would silently start from
+                    // an empty database and drop the saved sort.
                     "wishlist.db",
                 )
                     // Only holds UI preferences — items live in Firestore — so dropping it on a

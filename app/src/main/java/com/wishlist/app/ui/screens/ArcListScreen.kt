@@ -31,9 +31,9 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wishlist.app.data.SortField
+import com.wishlist.app.repository.ArcUiState
 import com.wishlist.app.repository.ItemGroup
 import com.wishlist.app.repository.TableRow
-import com.wishlist.app.repository.WishlistUiState
 import com.wishlist.app.repository.toItemGroups
 import com.wishlist.app.ui.theme.Serif
 import com.wishlist.app.util.formatDate
@@ -48,8 +48,8 @@ import com.wishlist.app.util.formatDate
  * appear in the table.
  */
 @Composable
-fun WishlistListScreen(
-    uiState: WishlistUiState,
+fun ArcListScreen(
+    uiState: ArcUiState,
     dark: Boolean,
     onToggleRowDone: (TableRow) -> Unit,
     onRowClick: (TableRow) -> Unit,

@@ -5,13 +5,13 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.FirebaseFirestore
 import com.wishlist.app.auth.AuthManager
+import com.wishlist.app.data.ArcDatabase
+import com.wishlist.app.data.ArcItem
 import com.wishlist.app.data.CategoryColorPref
-import com.wishlist.app.data.FirestoreWishlistRepository
+import com.wishlist.app.data.FirestoreArcRepository
 import com.wishlist.app.data.SortField
-import com.wishlist.app.data.WishlistDatabase
-import com.wishlist.app.data.WishlistItem
-import com.wishlist.app.repository.WishlistRepository
-import com.wishlist.app.repository.WishlistUiState
+import com.wishlist.app.repository.ArcRepository
+import com.wishlist.app.repository.ArcUiState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,27 +23,27 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class WishlistViewModel(application: Application) : AndroidViewModel(application) {
+class ArcViewModel(application: Application) : AndroidViewModel(application) {
 
     val authManager = AuthManager(application)
 
-    private val db = WishlistDatabase.getInstance(application)
+    private val db = ArcDatabase.getInstance(application)
 
     // Null before google-services.json is added: there's no default FirebaseApp yet, and
     // FirebaseFirestore.getInstance() throws IllegalStateException in that case.
     private val firestoreRepository = runCatching { FirebaseFirestore.getInstance() }.getOrNull()
-        ?.let { FirestoreWishlistRepository(it) }
-    private val repository = WishlistRepository(firestoreRepository, db.sortPreferenceDao())
+        ?.let { FirestoreArcRepository(it) }
+    private val repository = ArcRepository(firestoreRepository, db.sortPreferenceDao())
 
     // On by default: what's left to do is what the table is for. Unchecking brings the finished
     // lines back, struck through, without them ever having been deleted.
     private val hideCompleted = MutableStateFlow(true)
 
-    val uiState: StateFlow<WishlistUiState> = authManager.currentUser
+    val uiState: StateFlow<ArcUiState> = authManager.currentUser
         .flatMapLatest { user ->
             val uid = user?.uid
             if (uid == null) {
-                flowOf(WishlistUiState(isLoading = false))
+                flowOf(ArcUiState(isLoading = false))
             } else {
                 combine(
                     repository.observeRows(uid, hideCompleted),
@@ -52,7 +52,7 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
                     repository.observeCategoryColors(uid),
                     repository.observeSyncError(),
                 ) { rows, preference, hideDone, colors, syncError ->
-                    WishlistUiState(
+                    ArcUiState(
                         rows = rows,
                         sortField = preference.sortField,
                         ascending = preference.ascending,
@@ -65,7 +65,7 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
                 }
             }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), WishlistUiState())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ArcUiState())
 
     fun onHideCompletedChange(hide: Boolean) {
         hideCompleted.value = hide
@@ -101,17 +101,17 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
         return repository.observeMinorCategories(uid, major)
     }
 
-    fun saveItem(item: WishlistItem) {
+    fun saveItem(item: ArcItem) {
         val uid = authManager.currentUser.value?.uid ?: return
         viewModelScope.launch { repository.saveItem(uid, item) }
     }
 
-    fun deleteItem(item: WishlistItem) {
+    fun deleteItem(item: ArcItem) {
         val uid = authManager.currentUser.value?.uid ?: return
         viewModelScope.launch { repository.deleteItem(uid, item) }
     }
 
-    fun toggleSubItem(item: WishlistItem, index: Int) {
+    fun toggleSubItem(item: ArcItem, index: Int) {
         val uid = authManager.currentUser.value?.uid ?: return
         val subItem = item.subItems.getOrNull(index) ?: return
         val updated = item.subItems.toMutableList().apply { this[index] = subItem.copy(done = !subItem.done) }
@@ -119,7 +119,7 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
     }
 
     /** For the item-only row, where there is no 세부항목 to tick. */
-    fun toggleItemDone(item: WishlistItem) {
+    fun toggleItemDone(item: ArcItem) {
         val uid = authManager.currentUser.value?.uid ?: return
         viewModelScope.launch { repository.saveItem(uid, item.copy(isDone = !item.isDone)) }
     }

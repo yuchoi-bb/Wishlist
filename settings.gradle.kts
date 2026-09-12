@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Wishlist"
+rootProject.name = "Arc"
 include(":app")

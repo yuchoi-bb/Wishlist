@@ -65,13 +65,13 @@ private val DarkColors = darkColorScheme(
 )
 
 @Composable
-fun WishlistTheme(
+fun ArcTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
     MaterialTheme(
         colorScheme = if (darkTheme) DarkColors else LightColors,
-        typography = WishlistTypography,
+        typography = ArcTypography,
         content = content,
     )
 }

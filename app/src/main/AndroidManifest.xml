@@ -16,26 +16,26 @@
     </queries>
 
     <application
-        android:name=".WishlistApp"
+        android:name=".ArcApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
-        android:theme="@style/Theme.Wishlist"
+        android:theme="@style/Theme.Arc"
         android:supportsRtl="true">
 
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.Wishlist">
+            android:theme="@style/Theme.Arc">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Puts Wishlist in the share sheet of calendars and anything else that shares text.
+            <!-- Puts Arc in the share sheet of calendars and anything else that shares text.
                  text/calendar covers an .ics attachment, which carries the event's real title and
                  date; text/plain covers the human-readable version and every other app. -->
             <intent-filter>

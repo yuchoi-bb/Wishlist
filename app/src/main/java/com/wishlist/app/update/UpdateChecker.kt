@@ -77,7 +77,7 @@ class UpdateChecker(private val context: Context) {
         apkFile(update.version).delete()
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val request = DownloadManager.Request(Uri.parse(update.apkUrl))
-            .setTitle("Wishlist ${update.version} 업데이트")
+            .setTitle("Arc ${update.version} 업데이트")
             .setDescription("새 버전을 다운로드하고 있습니다")
             .setMimeType(APK_MIME_TYPE)
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
@@ -192,6 +192,8 @@ class UpdateChecker(private val context: Context) {
     private companion object {
         const val APK_MIME_TYPE = "application/vnd.android.package-archive"
         const val POLL_INTERVAL_MS = 400L
+        // Names the downloaded file on disk, so it stays as it is: deleteInstalledApks finds
+        // old downloads by this prefix, and renaming it would strand every APK already there.
         const val APK_PREFIX = "wishlist-"
         const val APK_SUFFIX = ".apk"
     }

@@ -1,9 +1,9 @@
 package com.wishlist.app.ui.screens
 
 import androidx.compose.ui.graphics.Color
+import com.wishlist.app.data.ArcItem
 import com.wishlist.app.data.CategoryColorPref
 import com.wishlist.app.data.SortField
-import com.wishlist.app.data.WishlistItem
 import com.wishlist.app.repository.TableRow
 import com.wishlist.app.ui.theme.categoryColor
 import com.wishlist.app.ui.theme.monthColor
@@ -80,7 +80,7 @@ fun tintFor(
 private fun labelFor(sortField: SortField, key: String, sample: TableRow): String = when {
     sortField == SortField.END_DATE && key == NO_DATE -> "예정일 없음"
     sortField == SortField.END_DATE -> key
-    key == WishlistItem.UNCATEGORIZED_KEY -> "분류 없음"
+    key == ArcItem.UNCATEGORIZED_KEY -> "분류 없음"
     else -> listOfNotNull(
         sample.item.majorCategory?.takeIf { it.isNotBlank() },
         sample.item.minorCategory?.takeIf { it.isNotBlank() },

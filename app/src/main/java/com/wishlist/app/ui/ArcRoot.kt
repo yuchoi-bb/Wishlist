@@ -9,22 +9,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.wishlist.app.data.WishlistItem
+import com.wishlist.app.data.ArcItem
 import com.wishlist.app.repository.TableRow
 import com.wishlist.app.share.SharedDraft
 import com.wishlist.app.ui.screens.AddEditItemDialog
+import com.wishlist.app.ui.screens.ArcListScreen
+import com.wishlist.app.ui.screens.ArcShell
+import com.wishlist.app.ui.screens.ArcTableScreen
 import com.wishlist.app.ui.screens.SettingsScreen
 import com.wishlist.app.ui.screens.SignInScreen
-import com.wishlist.app.ui.screens.WishlistListScreen
-import com.wishlist.app.ui.screens.WishlistShell
-import com.wishlist.app.ui.screens.WishlistTableScreen
 import com.wishlist.app.ui.theme.DeviceSettings
 import com.wishlist.app.ui.theme.ViewMode
 import com.wishlist.app.util.todayStartOfDayMillis
 
 @Composable
-fun WishlistRoot(
-    viewModel: WishlistViewModel = viewModel(),
+fun ArcRoot(
+    viewModel: ArcViewModel = viewModel(),
     /** Something another app shared, waiting to be turned into a 할 일. */
     sharedDraft: SharedDraft? = null,
     onSharedDraftHandled: () -> Unit = {},
@@ -36,13 +36,13 @@ fun WishlistRoot(
     val viewMode by deviceSettings.viewMode.collectAsStateWithLifecycle()
     var showSettings by remember { mutableStateOf(false) }
     var showAddEdit by remember { mutableStateOf(false) }
-    var editingItem by remember { mutableStateOf<WishlistItem?>(null) }
+    var editingItem by remember { mutableStateOf<ArcItem?>(null) }
 
     // A share opens the editor on a new item filled in from it — never saved behind the user's
     // back, so what came across can be corrected or filed before it lands in the list.
     LaunchedEffect(sharedDraft) {
         val draft = sharedDraft ?: return@LaunchedEffect
-        editingItem = WishlistItem(
+        editingItem = ArcItem(
             title = draft.title,
             memo = draft.memo,
             endDate = draft.endDate,
@@ -75,7 +75,7 @@ fun WishlistRoot(
         showAddEdit = true
     }
 
-    WishlistShell(
+    ArcShell(
         uiState = uiState,
         viewMode = viewMode,
         onViewModeChange = deviceSettings::setViewMode,
@@ -89,7 +89,7 @@ fun WishlistRoot(
     ) { dark ->
         // Same data, same sort, same filter — only the shape differs.
         when (viewMode) {
-            ViewMode.TABLE -> WishlistTableScreen(
+            ViewMode.TABLE -> ArcTableScreen(
                 uiState = uiState,
                 dark = dark,
                 onSortSelected = viewModel::onSortSelected,
@@ -97,7 +97,7 @@ fun WishlistRoot(
                 onRowClick = onRowClick,
             )
 
-            ViewMode.LIST -> WishlistListScreen(
+            ViewMode.LIST -> ArcListScreen(
                 uiState = uiState,
                 dark = dark,
                 onToggleRowDone = onToggleRowDone,

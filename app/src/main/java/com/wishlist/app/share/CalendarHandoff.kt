@@ -9,7 +9,7 @@ import android.widget.Toast
 /**
  * Hands a 할 일 (or one 세부항목) to whichever calendar app the user has, opening its new-event
  * screen already filled in. Done with an insert intent rather than by writing to the calendar
- * provider directly, so Wishlist never needs the calendar permissions, and the user still sees and
+ * provider directly, so Arc never needs the calendar permissions, and the user still sees and
  * confirms what gets added — and picks which calendar it lands in.
  */
 fun Context.addToCalendar(title: String, description: String?, dateMillis: Long) {

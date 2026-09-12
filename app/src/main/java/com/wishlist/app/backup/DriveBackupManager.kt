@@ -10,13 +10,13 @@ import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
 import com.google.api.services.drive.model.File as DriveFile
+import com.wishlist.app.data.ArcDatabase
+import com.wishlist.app.data.ArcItem
 import com.wishlist.app.data.CategoryColorPref
-import com.wishlist.app.data.FirestoreWishlistRepository
+import com.wishlist.app.data.FirestoreArcRepository
 import com.wishlist.app.data.SortField
 import com.wishlist.app.data.SortPreference
 import com.wishlist.app.data.SubItem
-import com.wishlist.app.data.WishlistDatabase
-import com.wishlist.app.data.WishlistItem
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -32,8 +32,8 @@ import org.json.JSONObject
  */
 class DriveBackupManager(
     private val context: Context,
-    private val database: WishlistDatabase,
-    private val firestoreRepository: FirestoreWishlistRepository,
+    private val database: ArcDatabase,
+    private val firestoreRepository: FirestoreArcRepository,
 ) {
     fun signedInAccount(): GoogleSignInAccount? = GoogleSignIn.getLastSignedInAccount(context)
 
@@ -69,7 +69,7 @@ class DriveBackupManager(
         val credential = GoogleAccountCredential.usingOAuth2(context, listOf(DriveScopes.DRIVE_APPDATA))
         credential.selectedAccount = requireNotNull(account.account) { "Google 계정 정보를 가져올 수 없습니다." }
         return Drive.Builder(NetHttpTransport(), GsonFactory.getDefaultInstance(), credential)
-            .setApplicationName("Wishlist")
+            .setApplicationName("Arc")
             .build()
     }
 
@@ -108,7 +108,7 @@ class DriveBackupManager(
         val root = JSONObject(text)
         val items = root.getJSONArray("items")
         for (i in 0 until items.length()) {
-            firestoreRepository.saveItem(uid, items.getJSONObject(i).toWishlistItem())
+            firestoreRepository.saveItem(uid, items.getJSONObject(i).toArcItem())
         }
         // Older backups carried a "prefs" array of per-category sorts, which no longer exists now
         // that one sort applies to the whole table; those are simply skipped.
@@ -124,7 +124,7 @@ class DriveBackupManager(
     }
 }
 
-private fun WishlistItem.toJson(): JSONObject = JSONObject().apply {
+private fun ArcItem.toJson(): JSONObject = JSONObject().apply {
     put("id", id)
     put("title", title)
     put("memo", memo)
@@ -149,7 +149,7 @@ private fun WishlistItem.toJson(): JSONObject = JSONObject().apply {
     put("position", position)
 }
 
-private fun JSONObject.toWishlistItem(): WishlistItem = WishlistItem(
+private fun JSONObject.toArcItem(): ArcItem = ArcItem(
     id = optString("id", ""),
     title = getString("title"),
     memo = if (isNull("memo")) null else optString("memo"),
@@ -173,7 +173,7 @@ private fun JSONObject.toWishlistItem(): WishlistItem = WishlistItem(
         else -> null
     },
     isDone = if (has("isDone")) optBoolean("isDone") else has("completedAt") && !isNull("completedAt"),
-    priority = optInt("priority", WishlistItem.DEFAULT_PRIORITY),
+    priority = optInt("priority", ArcItem.DEFAULT_PRIORITY),
     position = optLong("position", 0L),
 )
 

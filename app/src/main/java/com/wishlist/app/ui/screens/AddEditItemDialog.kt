@@ -14,8 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -53,12 +53,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.wishlist.app.data.ArcItem
 import com.wishlist.app.data.CategoryColorPref
 import com.wishlist.app.data.SubItem
-import com.wishlist.app.data.WishlistItem
 import com.wishlist.app.share.addToCalendar
 import com.wishlist.app.share.sendToTaskApp
-import com.wishlist.app.ui.WishlistViewModel
+import com.wishlist.app.ui.ArcViewModel
 import com.wishlist.app.ui.components.DateField
 import com.wishlist.app.ui.components.DateOnlyPicker
 import com.wishlist.app.ui.components.MonthEndChips
@@ -81,13 +81,13 @@ private val SUB_ITEM_TEXT_STYLE = TextStyle(fontSize = 14.sp)
  */
 @Composable
 fun AddEditItemDialog(
-    viewModel: WishlistViewModel,
+    viewModel: ArcViewModel,
     majorCategorySuggestions: List<String>,
     categoryColors: List<CategoryColorPref>,
-    editingItem: WishlistItem?,
+    editingItem: ArcItem?,
     onDismiss: () -> Unit,
-    onSave: (WishlistItem) -> Unit,
-    onDelete: (WishlistItem) -> Unit,
+    onSave: (ArcItem) -> Unit,
+    onDelete: (ArcItem) -> Unit,
 ) {
     val context = LocalContext.current
     var title by remember { mutableStateOf(editingItem?.title.orEmpty()) }
@@ -97,7 +97,7 @@ fun AddEditItemDialog(
     var startedAt by remember { mutableStateOf(editingItem?.startedAt ?: todayStartOfDayMillis()) }
     var endDate by remember { mutableStateOf(editingItem?.endDate) }
     var isDone by remember { mutableStateOf(editingItem?.isDone ?: false) }
-    var priority by remember { mutableIntStateOf(editingItem?.priority ?: WishlistItem.DEFAULT_PRIORITY) }
+    var priority by remember { mutableIntStateOf(editingItem?.priority ?: ArcItem.DEFAULT_PRIORITY) }
     // A 세부항목 with no date of its own starts from its parent 항목's 최종 종료일, so the table has a
     // real 완료예정일 to sort by instead of an empty cell. It stays editable per 세부항목.
     val subItems = remember {
@@ -136,7 +136,7 @@ fun AddEditItemDialog(
     // item look edited every time the form is compared against its starting state.
     val position = remember { editingItem?.position?.takeIf { it > 0 } ?: System.currentTimeMillis() }
 
-    fun edited() = WishlistItem(
+    fun edited() = ArcItem(
         id = editingItem?.id ?: "",
         title = title.trim(),
         memo = memo.trim().ifBlank { null },
@@ -207,7 +207,7 @@ fun AddEditItemDialog(
 
                 Text("우선순위", style = MaterialTheme.typography.labelSmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    WishlistItem.PRIORITIES.forEach { value ->
+                    ArcItem.PRIORITIES.forEach { value ->
                         FilterChip(
                             selected = priority == value,
                             onClick = { priority = value },
@@ -229,7 +229,7 @@ fun AddEditItemDialog(
                         if (endDate != null) {
                             TextButton(onClick = { endDate = null }) { Text("지우기") }
                             // Opens the calendar app's new-event screen filled in; the user picks
-                            // which calendar and confirms, so Wishlist needs no calendar permission.
+                            // which calendar and confirms, so Arc needs no calendar permission.
                             TextButton(
                                 enabled = title.isNotBlank(),
                                 onClick = {

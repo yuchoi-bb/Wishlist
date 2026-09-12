@@ -34,7 +34,7 @@ private val Sans = FontFamily.Default
  * Roomier than Material's defaults on purpose: the screens this app spends its time on are lists of
  * short lines, and the space between them is what keeps a long list calm.
  */
-val WishlistTypography = Typography(
+val ArcTypography = Typography(
     displaySmall = TextStyle(fontFamily = Serif, fontWeight = FontWeight.Bold, fontSize = 23.sp, lineHeight = 31.sp),
     headlineSmall = TextStyle(fontFamily = Serif, fontWeight = FontWeight.Bold, fontSize = 19.sp, lineHeight = 26.sp),
     titleLarge = TextStyle(fontFamily = Serif, fontWeight = FontWeight.Bold, fontSize = 19.sp, lineHeight = 26.sp),

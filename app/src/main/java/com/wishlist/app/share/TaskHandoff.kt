@@ -15,12 +15,12 @@ import java.time.format.DateTimeFormatter
  * Android has no standard provider or insert intent for to-do lists the way it has
  * [CalendarContract][android.provider.CalendarContract] for events, so there is nothing to fill in
  * directly the way [addToCalendar] does. ACTION_SEND is the one entry point every to-do app accepts,
- * and going through the chooser means Wishlist never has to name a particular app — it also needs no
+ * and going through the chooser means Arc never has to name a particular app — it also needs no
  * permission and no `<queries>` entry, because the chooser is a system component rather than an
- * activity Wishlist has to resolve for itself.
+ * activity Arc has to resolve for itself.
  *
  * The text is shaped the way [toSharedDraft] reads one back — title on the first line, details under
- * it, the date written so the parser finds it — so a 할 일 sent out and shared back into Wishlist on
+ * it, the date written so the parser finds it — so a 할 일 sent out and shared back into Arc on
  * another device survives the round trip.
  */
 fun Context.sendToTaskApp(title: String, memo: String?, dateMillis: Long?) {

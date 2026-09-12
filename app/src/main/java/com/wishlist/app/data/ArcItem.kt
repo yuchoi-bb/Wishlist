@@ -11,7 +11,7 @@ data class SubItem(
 )
 
 /** Stored as a Firestore document under users/{uid}/wishlist_items/{id}; id is "" for a not-yet-saved item. */
-data class WishlistItem(
+data class ArcItem(
     val id: String = "",
     val title: String = "",
     /** Free-form notes for this item. */

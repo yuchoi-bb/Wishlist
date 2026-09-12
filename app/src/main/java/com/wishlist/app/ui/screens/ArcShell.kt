@@ -43,8 +43,8 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.wishlist.app.data.SortField
+import com.wishlist.app.repository.ArcUiState
 import com.wishlist.app.repository.TableRow
-import com.wishlist.app.repository.WishlistUiState
 import com.wishlist.app.ui.theme.Serif
 import com.wishlist.app.ui.theme.ViewMode
 import com.wishlist.app.util.daysUntil
@@ -57,8 +57,8 @@ import com.wishlist.app.util.formatToday
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WishlistShell(
-    uiState: WishlistUiState,
+fun ArcShell(
+    uiState: ArcUiState,
     viewMode: ViewMode,
     onViewModeChange: (ViewMode) -> Unit,
     onHideCompletedChange: (Boolean) -> Unit,
@@ -74,7 +74,7 @@ fun WishlistShell(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Wishlist", style = MaterialTheme.typography.titleLarge) },
+                title = { Text("Arc", style = MaterialTheme.typography.titleLarge) },
                 actions = {
                     // One tap to compare the two shapes; 설정 has the same choice spelled out.
                     IconButton(

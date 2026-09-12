@@ -45,8 +45,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.wishlist.app.BuildConfig
 import com.wishlist.app.auth.AuthManager
 import com.wishlist.app.backup.DriveBackupManager
-import com.wishlist.app.data.FirestoreWishlistRepository
-import com.wishlist.app.data.WishlistDatabase
+import com.wishlist.app.data.ArcDatabase
+import com.wishlist.app.data.FirestoreArcRepository
 import com.wishlist.app.ui.theme.DeviceSettings
 import com.wishlist.app.ui.theme.ThemeMode
 import com.wishlist.app.ui.theme.ViewMode
@@ -58,8 +58,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(authManager: AuthManager, onBack: () -> Unit) {
     val context = LocalContext.current
-    val database = remember { WishlistDatabase.getInstance(context) }
-    val firestoreRepository = remember { FirestoreWishlistRepository(FirebaseFirestore.getInstance()) }
+    val database = remember { ArcDatabase.getInstance(context) }
+    val firestoreRepository = remember { FirestoreArcRepository(FirebaseFirestore.getInstance()) }
     val backupManager = remember { DriveBackupManager(context, database, firestoreRepository) }
     val updateChecker = remember { UpdateChecker(context) }
     val deviceSettings = remember { DeviceSettings.get(context) }

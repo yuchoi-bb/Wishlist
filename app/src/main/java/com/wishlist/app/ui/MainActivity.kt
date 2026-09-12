@@ -23,9 +23,9 @@ import com.wishlist.app.CrashLog
 import com.wishlist.app.share.SharedDraft
 import com.wishlist.app.share.toSharedDraft
 import com.wishlist.app.ui.screens.CrashScreen
+import com.wishlist.app.ui.theme.ArcTheme
 import com.wishlist.app.ui.theme.DeviceSettings
 import com.wishlist.app.ui.theme.ThemeMode
-import com.wishlist.app.ui.theme.WishlistTheme
 import com.wishlist.app.update.AutoUpdater
 
 class MainActivity : ComponentActivity() {
@@ -33,7 +33,7 @@ class MainActivity : ComponentActivity() {
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
-    /** Set when another app shared something into Wishlist; the editor opens filled in from it. */
+    /** Set when another app shared something into Arc; the editor opens filled in from it. */
     private var sharedDraft by mutableStateOf<SharedDraft?>(null)
 
     override fun onNewIntent(intent: Intent) {
@@ -63,7 +63,7 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.DARK -> true
             }
 
-            WishlistTheme(darkTheme = darkTheme) {
+            ArcTheme(darkTheme = darkTheme) {
                 val context = LocalContext.current
                 var crash by remember { mutableStateOf(CrashLog.readAndClear(context)) }
 
@@ -80,7 +80,7 @@ class MainActivity : ComponentActivity() {
                             // crashed.
                             CrashScreen(crash = crash!!, onDismiss = { crash = null })
                         } else {
-                            WishlistRoot(
+                            ArcRoot(
                                 sharedDraft = sharedDraft,
                                 onSharedDraftHandled = { sharedDraft = null },
                             )

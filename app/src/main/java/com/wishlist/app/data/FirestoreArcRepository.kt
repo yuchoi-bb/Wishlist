@@ -16,7 +16,7 @@ import kotlinx.coroutines.tasks.await
  * reads/writes for free; changes made on one device are pushed to every other listening device
  * as soon as they're online.
  */
-class FirestoreWishlistRepository(private val firestore: FirebaseFirestore) {
+class FirestoreArcRepository(private val firestore: FirebaseFirestore) {
 
     /**
      * The last listener failure, or null while sync is healthy. A rejected listener used to be
@@ -25,10 +25,12 @@ class FirestoreWishlistRepository(private val firestore: FirebaseFirestore) {
      */
     val syncError = MutableStateFlow<String?>(null)
 
+    // Where every user's items already live, and invisible to them, so it keeps the old name: a
+    // rename here would point the app at an empty collection and read as total data loss.
     private fun itemsCollection(uid: String) =
         firestore.collection("users").document(uid).collection("wishlist_items")
 
-    fun observeItems(uid: String): Flow<List<WishlistItem>> = callbackFlow {
+    fun observeItems(uid: String): Flow<List<ArcItem>> = callbackFlow {
         val registration = itemsCollection(uid).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 syncError.value = error.describe("할 일")
@@ -36,12 +38,12 @@ class FirestoreWishlistRepository(private val firestore: FirebaseFirestore) {
                 return@addSnapshotListener
             }
             syncError.value = null
-            trySend(snapshot?.documents.orEmpty().map { it.toWishlistItem() })
+            trySend(snapshot?.documents.orEmpty().map { it.toArcItem() })
         }
         awaitClose { registration.remove() }
     }
 
-    suspend fun saveItem(uid: String, item: WishlistItem) = guarded("할 일") {
+    suspend fun saveItem(uid: String, item: ArcItem) = guarded("할 일") {
         val data = item.toFirestoreMap()
         if (item.id.isBlank()) {
             itemsCollection(uid).add(data).await()
@@ -50,7 +52,7 @@ class FirestoreWishlistRepository(private val firestore: FirebaseFirestore) {
         }
     }
 
-    suspend fun deleteItem(uid: String, item: WishlistItem) = guarded("할 일") {
+    suspend fun deleteItem(uid: String, item: ArcItem) = guarded("할 일") {
         if (item.id.isNotBlank()) itemsCollection(uid).document(item.id).delete().await()
     }
 
@@ -68,8 +70,8 @@ class FirestoreWishlistRepository(private val firestore: FirebaseFirestore) {
             }
     }
 
-    suspend fun getAllItemsOnce(uid: String): List<WishlistItem> =
-        itemsCollection(uid).get().await().documents.map { it.toWishlistItem() }
+    suspend fun getAllItemsOnce(uid: String): List<ArcItem> =
+        itemsCollection(uid).get().await().documents.map { it.toArcItem() }
 
     // Category colors live in a single document rather than one per category: the whole set is
     // small, always read together, and rewritten as a unit whenever one color changes.
@@ -126,11 +128,11 @@ private fun DocumentSnapshot?.readCategoryColors(): List<CategoryColorPref> {
     }
 }
 
-private fun DocumentSnapshot.toWishlistItem(): WishlistItem {
+private fun DocumentSnapshot.toArcItem(): ArcItem {
     // Documents written before 완료일 was split into 종료일 + 완료 only have completedAt, which
     // meant "finished on this date" — read it as both the end date and the done flag.
     val legacyCompletedAt = getLong("completedAt")
-    return WishlistItem(
+    return ArcItem(
         id = id,
         title = getString("title") ?: "",
         memo = getString("memo"),
@@ -140,7 +142,7 @@ private fun DocumentSnapshot.toWishlistItem(): WishlistItem {
         startedAt = getLong("startedAt") ?: 0L,
         endDate = getLong("endDate") ?: legacyCompletedAt,
         isDone = getBoolean("isDone") ?: (legacyCompletedAt != null),
-        priority = (getLong("priority") ?: WishlistItem.DEFAULT_PRIORITY.toLong()).toInt(),
+        priority = (getLong("priority") ?: ArcItem.DEFAULT_PRIORITY.toLong()).toInt(),
         position = getLong("position") ?: 0L,
     )
 }
@@ -157,7 +159,7 @@ private fun DocumentSnapshot.readSubItems(): List<SubItem> {
     }
 }
 
-private fun WishlistItem.toFirestoreMap(): Map<String, Any?> = mapOf(
+private fun ArcItem.toFirestoreMap(): Map<String, Any?> = mapOf(
     "title" to title,
     "memo" to memo,
     "subItems" to subItems.map {

@@ -35,8 +35,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.wishlist.app.data.SortField
+import com.wishlist.app.repository.ArcUiState
 import com.wishlist.app.repository.TableRow
-import com.wishlist.app.repository.WishlistUiState
 import com.wishlist.app.ui.theme.Serif
 import com.wishlist.app.ui.theme.dueColors
 import com.wishlist.app.ui.theme.dueStateOf
@@ -83,8 +83,8 @@ private const val MAX_TEXT_SCALE = 1.25f
  * a rail reads at the same strength in both themes, which a wash over the row does not.
  */
 @Composable
-fun WishlistTableScreen(
-    uiState: WishlistUiState,
+fun ArcTableScreen(
+    uiState: ArcUiState,
     dark: Boolean,
     onSortSelected: (SortField) -> Unit,
     onToggleRowDone: (TableRow) -> Unit,

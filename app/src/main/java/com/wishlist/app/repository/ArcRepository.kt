@@ -1,12 +1,12 @@
 package com.wishlist.app.repository
 
+import com.wishlist.app.data.ArcItem
 import com.wishlist.app.data.CategoryColorPref
-import com.wishlist.app.data.FirestoreWishlistRepository
+import com.wishlist.app.data.FirestoreArcRepository
 import com.wishlist.app.data.SortField
 import com.wishlist.app.data.SortPreference
 import com.wishlist.app.data.SortPreferenceDao
 import com.wishlist.app.data.SubItem
-import com.wishlist.app.data.WishlistItem
 import java.text.Collator
 import java.util.Locale
 import kotlinx.coroutines.flow.Flow
@@ -14,9 +14,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
-class WishlistRepository(
+class ArcRepository(
     // Null before google-services.json/Firebase project setup is complete.
-    private val firestoreRepository: FirestoreWishlistRepository?,
+    private val firestoreRepository: FirestoreArcRepository?,
     private val sortPreferenceDao: SortPreferenceDao,
 ) {
     fun observeMinorCategories(uid: String, major: String): Flow<List<String>> =
@@ -27,15 +27,15 @@ class WishlistRepository(
                 .sorted()
         }
 
-    suspend fun saveItem(uid: String, item: WishlistItem) {
+    suspend fun saveItem(uid: String, item: ArcItem) {
         firestoreRepository?.saveItem(uid, item)
     }
 
-    suspend fun deleteItem(uid: String, item: WishlistItem) {
+    suspend fun deleteItem(uid: String, item: ArcItem) {
         firestoreRepository?.deleteItem(uid, item)
     }
 
-    suspend fun updateSubItems(uid: String, item: WishlistItem, subItems: List<SubItem>) {
+    suspend fun updateSubItems(uid: String, item: ArcItem, subItems: List<SubItem>) {
         firestoreRepository?.saveItem(uid, item.copy(subItems = subItems))
     }
 
@@ -57,7 +57,7 @@ class WishlistRepository(
         sortPreferenceDao.upsert(SortPreference(sortField = sortField, ascending = ascending))
     }
 
-    private fun itemsFlow(uid: String): Flow<List<WishlistItem>> =
+    private fun itemsFlow(uid: String): Flow<List<ArcItem>> =
         firestoreRepository?.observeItems(uid) ?: flowOf(emptyList())
 
     /**
@@ -86,7 +86,7 @@ class WishlistRepository(
 
     /** 항목 line + its own 세부항목 lines, with the items themselves ordered by the sort field. */
     private fun groupedRows(
-        items: List<WishlistItem>,
+        items: List<ArcItem>,
         preference: SortPreference,
         includeCompleted: Boolean,
     ): List<TableRow> {
@@ -101,7 +101,7 @@ class WishlistRepository(
 
     /** One line per 세부항목 across every item, ordered on its own. */
     private fun flatRows(
-        items: List<WishlistItem>,
+        items: List<ArcItem>,
         preference: SortPreference,
         includeCompleted: Boolean,
     ): List<TableRow> {
@@ -119,9 +119,9 @@ class WishlistRepository(
     }
 
     /** Orders whole 항목 for the 항목-level sort fields. */
-    private fun itemComparator(field: SortField): Comparator<WishlistItem> {
+    private fun itemComparator(field: SortField): Comparator<ArcItem> {
         val collator = Collator.getInstance(Locale.KOREAN)
-        val byField: Comparator<WishlistItem> = when (field) {
+        val byField: Comparator<ArcItem> = when (field) {
             // 대분류 and 중분류 are one key: 중분류 only breaks ties inside the same 대분류, so a
             // category is never split apart by the sort.
             SortField.CATEGORY -> Comparator { a, b ->
