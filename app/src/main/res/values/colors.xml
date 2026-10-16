@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-      Ground for both adaptive icons. minSdk is 26, so mipmap-anydpi-v26 always wins and this colour
-      is the icon's background on every device the app runs on; the legacy ic_launcher*.png bitmaps
-      are never rendered and still carry the old white ground.
+      Ground for both adaptive icons. minSdk is 26, so mipmap-anydpi-v26 always wins and this is
+      the icon's background on every device the app runs on.
 
-      Against the mark's navy (#071C66) this red sits at 2.8:1 — under the 3:1 a shape needs to stay
-      crisp, so the silhouette softens at launcher size. Pushing the ground lighter (#E0693E reaches
-      4.6:1) or repainting the mark cream over a deeper red would both fix it.
+      The mark is cream rather than the navy it started as, which is what lets this red go deep:
+      pairing them measures 7.3:1, where navy on any true red stayed under the 3:1 a shape needs to
+      keep its edges and the eagle turned to mush at 48px. Change one of the two and check the
+      other — the legacy ic_launcher*.png bitmaps carry the same pair baked in and have to follow,
+      even though nothing renders them at this minSdk.
     -->
-    <color name="ic_launcher_background">#C0392B</color>
+    <color name="ic_launcher_background">#8E2420</color>
 </resources>
