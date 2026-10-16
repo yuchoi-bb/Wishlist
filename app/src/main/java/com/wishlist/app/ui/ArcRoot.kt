@@ -1,5 +1,6 @@
 package com.wishlist.app.ui
 
+import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -12,6 +13,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.wishlist.app.data.ArcItem
 import com.wishlist.app.repository.TableRow
 import com.wishlist.app.share.SharedDraft
+import com.wishlist.app.share.clipboardText
+import com.wishlist.app.share.draftFromText
 import com.wishlist.app.ui.screens.AddEditItemDialog
 import com.wishlist.app.ui.screens.ArcListScreen
 import com.wishlist.app.ui.screens.ArcShell
@@ -38,17 +41,23 @@ fun ArcRoot(
     var showAddEdit by remember { mutableStateOf(false) }
     var editingItem by remember { mutableStateOf<ArcItem?>(null) }
 
-    // A share opens the editor on a new item filled in from it — never saved behind the user's
-    // back, so what came across can be corrected or filed before it lands in the list.
-    LaunchedEffect(sharedDraft) {
-        val draft = sharedDraft ?: return@LaunchedEffect
+    // Text arriving from outside — shared in, or pasted — opens the editor on a new item filled
+    // in from it. Never saved behind the user's back, so what came across can be corrected or
+    // filed before it lands in the list, and a misread list is fixed in the same breath.
+    val openDraft: (SharedDraft) -> Unit = { draft ->
         editingItem = ArcItem(
             title = draft.title,
             memo = draft.memo,
             endDate = draft.endDate,
+            subItems = draft.subItems,
             startedAt = todayStartOfDayMillis(),
         )
         showAddEdit = true
+    }
+
+    LaunchedEffect(sharedDraft) {
+        val draft = sharedDraft ?: return@LaunchedEffect
+        openDraft(draft)
         onSharedDraftHandled()
     }
 
@@ -84,6 +93,14 @@ fun ArcRoot(
         onAddClick = {
             editingItem = null
             showAddEdit = true
+        },
+        onPasteClick = {
+            val draft = context.clipboardText()?.let(::draftFromText)
+            if (draft == null) {
+                Toast.makeText(context, "붙여넣을 내용이 없습니다.", Toast.LENGTH_SHORT).show()
+            } else {
+                openDraft(draft)
+            }
         },
         onSettingsClick = { showSettings = true },
     ) { dark ->

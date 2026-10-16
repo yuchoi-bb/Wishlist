@@ -4,15 +4,18 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import com.wishlist.app.data.SubItem
 import com.wishlist.app.util.toStartOfDayMillis
 import java.time.LocalDate
 import java.time.ZoneId
 
-/** A 할 일 sketched out from something another app shared, ready to open the editor with. */
+/** A 할 일 sketched out from text another app handed over, ready to open the editor with. */
 data class SharedDraft(
     val title: String,
     val memo: String?,
     val endDate: Long?,
+    /** Steps read out of a shared list; empty when the text named only one thing. */
+    val subItems: List<SubItem> = emptyList(),
 )
 
 /**
@@ -32,6 +35,10 @@ fun Intent.toSharedDraft(context: Context): SharedDraft? {
     val body = getStringExtra(Intent.EXTRA_TEXT)?.trim()?.takeIf { it.isNotBlank() }
     if (subject == null && body == null) return null
 
+    // A list wins over the subject, which on a chat app is the conversation's name — further from
+    // what the 항목 is about than the line the list itself puts at the top.
+    body?.let(::parseDiscussion)?.let { return it }
+
     // A shared event's first line is its title; the rest is when and where, which belongs in 메모.
     val title = subject ?: body!!.lineSequence().first().trim()
     val memo = when {
@@ -43,6 +50,20 @@ fun Intent.toSharedDraft(context: Context): SharedDraft? {
         else -> null
     }
     return SharedDraft(title = title.take(MAX_TITLE), memo = memo, endDate = body?.let(::findDate))
+}
+
+/**
+ * The same reading applied to text the user pasted rather than shared, so 붙여넣기 and the share
+ * sheet produce the identical 할 일. Falls back to the one-line reading when the text isn't a list.
+ */
+fun draftFromText(text: String): SharedDraft? {
+    val trimmed = text.trim().takeIf { it.isNotBlank() } ?: return null
+    parseDiscussion(trimmed)?.let { return it }
+    return SharedDraft(
+        title = trimmed.lineSequence().first().trim().take(MAX_TITLE),
+        memo = trimmed.substringAfter('\n', "").trim().ifBlank { null },
+        endDate = findDate(trimmed),
+    )
 }
 
 /**
@@ -90,7 +111,7 @@ private fun fromIcs(text: String): SharedDraft? {
 }
 
 /** First date in the shared text, in any of the formats a Korean or ISO calendar entry uses. */
-private fun findDate(text: String): Long? {
+internal fun findDate(text: String): Long? {
     val match = Regex("(\\d{4})\\s*[-./년]\\s*(\\d{1,2})\\s*[-./월]\\s*(\\d{1,2})").find(text) ?: return null
     val (year, month, day) = match.destructured
     return dateOf(year, month, day)
@@ -104,4 +125,4 @@ private fun dateOf(year: String, month: String, day: String): Long? = runCatchin
         .toStartOfDayMillis()
 }.getOrNull()
 
-private const val MAX_TITLE = 120
+internal const val MAX_TITLE = 120

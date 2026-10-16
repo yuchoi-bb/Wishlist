@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.ViewAgenda
@@ -64,6 +65,7 @@ fun ArcShell(
     onHideCompletedChange: (Boolean) -> Unit,
     onSortSelected: (SortField) -> Unit,
     onAddClick: () -> Unit,
+    onPasteClick: () -> Unit,
     onSettingsClick: () -> Unit,
     body: @Composable (dark: Boolean) -> Unit,
 ) {
@@ -76,6 +78,12 @@ fun ArcShell(
             TopAppBar(
                 title = { Text("Arc", style = MaterialTheme.typography.titleLarge) },
                 actions = {
+                    // Reads whatever was copied out of a chat and opens the editor on it. Sits
+                    // beside 설정 rather than under the FAB because it starts the same 할 일 the FAB
+                    // does, only filled in from the clipboard instead of empty.
+                    IconButton(onClick = onPasteClick) {
+                        Icon(Icons.Filled.ContentPaste, contentDescription = "붙여넣어 추가")
+                    }
                     // One tap to compare the two shapes; 설정 has the same choice spelled out.
                     IconButton(
                         onClick = {
