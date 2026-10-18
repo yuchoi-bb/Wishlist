@@ -40,7 +40,7 @@ rather than chosen per request, so a caller who got through still cannot reach a
 
 | Variable | Required | Meaning |
 |---|---|---|
-| `ARC_USER_UID` | yes | Firebase Auth uid to write under. Firebase Console → Authentication → Users (the app's 설정 screen only shows the first 8 characters) |
+| `ARC_USER_UID` | yes | Firebase Auth uid to write under. Firebase Console → Authentication → Users → the 사용자 UID column. The app never shows it: 설정 prints the account's email, and falls back to a truncated uid only when both email and display name are missing, which a Google sign-in supplies |
 | `ARC_MCP_TOKEN` | yes | Shared secret. `openssl rand -hex 32` |
 | `ARC_TIMEZONE` | no | Defaults to `Asia/Seoul` |
 | `FIREBASE_SERVICE_ACCOUNT` | no | Service-account JSON. Omit on Cloud Run, where the attached service account is picked up automatically |
