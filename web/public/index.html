@@ -93,7 +93,52 @@ td.remaining { padding-block: 6px; }
 #gate p { color: var(--muted); max-width: 30em; margin: 0 auto 20px; line-height: 1.7; }
 #gate h2 { font-family: "Gowun Batang", Georgia, serif; font-weight: 700; font-size: 20px; }
 
-body[data-signed-in="no"] #app, body[data-signed-in="no"] #signout { display: none; }
+/* editor */
+dialog {
+  border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink);
+  padding: 0; width: min(560px, calc(100vw - 32px)); max-height: 88vh;
+}
+dialog::backdrop { background: rgb(0 0 0 / .5); }
+dialog h2 {
+  font-family: "Gowun Batang", Georgia, serif; font-size: 20px; margin: 0;
+  padding: 18px 20px 12px;
+}
+#editor-form { padding: 0 20px; overflow-y: auto; max-height: calc(88vh - 150px); }
+.field { display: block; margin-bottom: 14px; }
+.field > span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+.field.inline { display: flex; align-items: center; gap: 8px; }
+.field.inline > span { margin: 0; font-size: 14px; color: var(--ink); }
+#editor-form input[type="text"], #editor-form input[type="date"], #editor-form textarea {
+  font: inherit; width: 100%; color: var(--ink); background: var(--paper);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+}
+#editor-form textarea { resize: vertical; }
+#editor-form input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--accent); }
+.segmented { display: flex; gap: 6px; }
+.segmented button { flex: 1; }
+.segmented button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+.sub-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+/* Both selectors carry #editor-form: the plain width:100% rule above is an ID selector and would
+   otherwise win, leaving the date field to take the whole row and squeeze the name to nothing. */
+#editor-form .sub-row input[type="text"] { flex: 1 1 auto; width: auto; min-width: 0; }
+#editor-form .sub-row input[type="date"] { flex: 0 0 auto; width: 9.5em; }
+#editor-form .sub-row input[type="checkbox"] { flex: 0 0 auto; }
+.sub-add { display: flex; gap: 6px; margin-top: 8px; }
+.sub-add input { flex: 1; }
+button.icon { padding: 4px 9px; }
+.dialog-actions {
+  display: flex; gap: 8px; padding: 14px 20px 18px; border-top: 1px solid var(--line); margin-top: 6px;
+}
+.dialog-actions .spacer { flex: 1; }
+#editor-save { background: var(--accent); color: #fff; border-color: var(--accent); }
+#fab {
+  position: fixed; right: 24px; bottom: 24px; padding: 13px 20px; border-radius: 999px;
+  background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 500;
+  box-shadow: 0 4px 16px rgb(0 0 0 / .25);
+}
+tbody tr[data-editable] { cursor: pointer; }
+
+body[data-signed-in="no"] #app, body[data-signed-in="no"] #signout, body[data-signed-in="no"] #fab { display: none; }
 body[data-signed-in="yes"] #gate, body[data-signed-in="yes"] #signin { display: none; }
 
 @media (max-width: 640px) {
@@ -151,6 +196,19 @@ body[data-signed-in="yes"] #gate, body[data-signed-in="yes"] #signin { display: 
     <p id="empty" hidden></p>
   </div>
 </main>
+
+<button id="fab">+ 할 일 추가</button>
+
+<dialog id="editor">
+  <h2></h2>
+  <form id="editor-form" onsubmit="return false"></form>
+  <div class="dialog-actions">
+    <button type="button" id="editor-delete">삭제</button>
+    <span class="spacer"></span>
+    <button type="button" id="editor-cancel">취소</button>
+    <button type="button" id="editor-save">저장</button>
+  </div>
+</dialog>
 
 <script type="module" src="app.js"></script>
 <script type="module">

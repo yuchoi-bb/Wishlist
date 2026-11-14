@@ -10,12 +10,13 @@ import {
   GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut,
 } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js';
 import {
-  collection, doc, getFirestore, onSnapshot, updateDoc,
+  addDoc, collection, deleteDoc, doc, getFirestore, onSnapshot, setDoc, updateDoc,
 } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js';
 import {
   SORT_FIELDS, buildRows, categoryColor, effectiveEndDate, formatDate, formatRemainingDays,
   formatYearMonth, monthColor, priorityLabel, rowIsDone, daysUntil,
 } from './table.js';
+import { showEditor } from './editor.js';
 
 const $ = (id) => document.getElementById(id);
 const state = {
@@ -117,6 +118,51 @@ async function toggle(row) {
   await updateDoc(ref, patch).catch(showError);
 }
 
+/**
+ * The document shape ArcItem.toFirestoreMap writes on Android, field for field. A name that drifts
+ * from the app's is dropped on its next read, so this list stays in step with that function.
+ */
+const toDocument = (item) => ({
+  title: item.title,
+  memo: item.memo,
+  subItems: item.subItems.map((s) => ({ title: s.title, done: s.done, endDate: s.endDate })),
+  majorCategory: item.majorCategory,
+  minorCategory: item.minorCategory,
+  startedAt: item.startedAt,
+  endDate: item.endDate,
+  isDone: item.isDone,
+  priority: item.priority,
+  position: item.position,
+});
+
+const itemsRef = () => collection(state.db, 'users', state.uid, 'wishlist_items');
+
+/** Opens the editor on an existing 할 일, or on a new one when given null, and saves the result. */
+async function edit(item) {
+  const majors = [...new Set(state.items.map((i) => i.majorCategory).filter(Boolean))].sort(
+    (a, b) => a.localeCompare(b, 'ko'));
+  const result = await showEditor(item, {
+    majorCategories: majors,
+    minorCategoriesFor: (major) => [...new Set(state.items
+      .filter((i) => i.majorCategory === major)
+      .map((i) => i.minorCategory)
+      .filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko')),
+  });
+  if (!result) return;
+
+  try {
+    if (result.action === 'delete') {
+      await deleteDoc(doc(itemsRef(), item.id));
+    } else if (result.item.id) {
+      await setDoc(doc(itemsRef(), result.item.id), toDocument(result.item));
+    } else {
+      await addDoc(itemsRef(), toDocument(result.item));
+    }
+  } catch (error) {
+    showError(error);
+  }
+}
+
 /* ------------------------------------------------------------------ render */
 
 const dark = () => matchMedia('(prefers-color-scheme: dark)').matches;
@@ -196,6 +242,8 @@ function tableRow(row, isDark) {
   const done = rowIsDone(row);
 
   const tr = document.createElement('tr');
+  tr.dataset.editable = '';
+  tr.onclick = (e) => { if (!e.target.closest('.check')) edit(item); };
   if (done) tr.classList.add('done');
   if (row.grouped && row.subIndex >= 0) tr.classList.add('child');
 
@@ -251,6 +299,7 @@ function showError(error) {
 $('hide-completed').onchange = (e) => { state.hideCompleted = e.target.checked; render(); };
 $('sort').onchange = (e) => { state.sortField = e.target.value; render(); };
 $('direction').onclick = () => { state.ascending = !state.ascending; render(); };
+$('fab').onclick = () => edit(null);
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
 
 for (const field of SORT_FIELDS) {

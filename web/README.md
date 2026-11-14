@@ -17,8 +17,13 @@ about a second.
 - All six sorts, either direction, and 완료항목 숨기기
 - Ticking 완료 — a 세부항목 line flips that step, an 항목 line flips the whole item, neither
   cascading into the other, which is what the app's own toggles do
+- Adding, editing and deleting, through the same editor the app has, in its field order:
+  할 일 → 우선순위 → 최종 종료일 → 세부항목 → 분류 → 메모, with 시작일 and 완료 at the end.
+  A row opens it; 할 일 추가 opens an empty one. 대/중분류 suggest what is already in use, and a
+  new 세부항목 inherits the 항목's 최종 종료일, as the app's editor does.
 
-It does not add, edit or delete. That stays in the app.
+Dates go in as epoch millis at local midnight, which `new Date(y, m, d)` gives directly — the
+browser is in the same zone as the phone, so nothing has to be converted the way ../mcp does it.
 
 ## Deploying
 
