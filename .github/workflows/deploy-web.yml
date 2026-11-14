@@ -36,6 +36,13 @@ jobs:
             echo "::error::FIREBASE_SERVICE_ACCOUNT_UP_WISHLIST secret is not set. See the 자동 배포 section of web/README.md."
             exit 1
           fi
+          # A raw newline inside private_key is what copying the key out of a wrapping terminal
+          # leaves behind. Firebase reports that as "Bad control character in string literal ... at
+          # position 316", which reads like a Firebase fault rather than a damaged paste.
+          if ! printf '%s' "$SERVICE_ACCOUNT" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; then
+            echo "::error::The secret is not valid JSON. If it was copied out of a terminal, a line break landed inside private_key. Set it from the file instead, without a clipboard: gh secret set FIREBASE_SERVICE_ACCOUNT_UP_WISHLIST --repo yuchoi-bb/Wishlist < key.json"
+            exit 1
+          fi
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
