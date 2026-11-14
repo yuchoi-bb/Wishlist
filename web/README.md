@@ -73,7 +73,21 @@ exact name: GitHub → Settings → Secrets and variables → Actions.
 The workflow only watches the branch named in its `on.push.branches`. If the work moves to another
 branch, change it there too, or pushes keep succeeding while the site stops updating.
 
-Running it by hand stays available: GitHub → Actions → Deploy web → Run workflow.
+Running it by hand: GitHub → Actions → Deploy web → **Re-run all jobs** on a finished run. The
+**Run workflow** button is not there, and will not be until this workflow file reaches the
+repository's default branch — GitHub reads `workflow_dispatch` only from that branch, whatever
+branch the run would target. Pushing to `web/` is the normal trigger either way.
+
+The secret is the service account key file verbatim. Copying it out of a terminal breaks it: long
+lines wrap, the wrap becomes a real newline inside `private_key`, and Firebase then fails with
+`Bad control character in string literal ... have you run firebase login?`, which points at the
+wrong thing entirely. Set it from the file and skip the clipboard:
+
+```bash
+gh secret set FIREBASE_SERVICE_ACCOUNT_UP_WISHLIST --repo yuchoi-bb/Wishlist < key.json
+```
+
+The workflow parses the secret before it deploys, so a damaged one is named as damaged.
 
 ### Trying it locally
 

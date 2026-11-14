@@ -5,6 +5,10 @@ name: Deploy web
 #
 # The branch below is the one this is developed on. If the work moves, change it here too, or the
 # site quietly stops updating while pushes keep succeeding.
+#
+# workflow_dispatch is here, but GitHub only shows its Run workflow button once this file is on the
+# repository's DEFAULT branch — which is a different one. Until then a push is the trigger, and a
+# finished run can be repeated from its own page with Re-run all jobs.
 on:
   push:
     branches: ["claude/delete-desktop-binary-ctmafb"]
