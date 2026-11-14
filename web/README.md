@@ -48,6 +48,33 @@ Google sign-in needs the domain on Firebase Console → Authentication → Setti
 `web.app` and `firebaseapp.com` are there by default, so a plain Hosting deploy needs no change; a
 custom domain does.
 
+### 자동 배포 (한 번만 설정하면 끝)
+
+`.github/workflows/deploy-web.yml` deploys on every push that touches `web/`, so after the setup
+below nobody has to run the CLI again.
+
+It needs one GitHub secret — a Google service account that may publish to Hosting. The Firebase
+CLI creates the account, grants it, and uploads the secret in one go:
+
+```bash
+cd web
+npx -y firebase-tools init hosting:github
+```
+
+It asks for the repository (`yuchoi-bb/Wishlist`) and opens a browser to authorise GitHub. Answer
+**no** when it offers to set up a workflow file — one is already here, pointed at this repo's
+layout; the generated one assumes `firebase.json` sits at the root.
+
+The secret it creates is named `FIREBASE_SERVICE_ACCOUNT_UP_WISHLIST`, which is the name the
+workflow reads. If you make the key by hand instead (GCP Console → IAM → 서비스 계정, role
+**Firebase Hosting Admin**, JSON key), paste the whole JSON into a repository secret under that
+exact name: GitHub → Settings → Secrets and variables → Actions.
+
+The workflow only watches the branch named in its `on.push.branches`. If the work moves to another
+branch, change it there too, or pushes keep succeeding while the site stops updating.
+
+Running it by hand stays available: GitHub → Actions → Deploy web → Run workflow.
+
 ### Trying it locally
 
 ```bash

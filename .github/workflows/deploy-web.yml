@@ -1,0 +1,49 @@
+name: Deploy web
+
+# Pushing is the deploy. Only web/ matters to the site, so a change anywhere else — the Android
+# app, the MCP server — doesn't spend a run or republish identical files.
+#
+# The branch below is the one this is developed on. If the work moves, change it here too, or the
+# site quietly stops updating while pushes keep succeeding.
+on:
+  push:
+    branches: ["claude/delete-desktop-binary-ctmafb"]
+    paths: ["web/**", ".github/workflows/deploy-web.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time, and a newer push wins: two overlapping runs could otherwise land in the
+# wrong order and leave the site on the older commit.
+concurrency:
+  group: deploy-web
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Without this the action fails somewhere inside Firebase's own auth, which reads as a
+      # Firebase problem rather than a missing secret. Fail here instead, saying what to do.
+      - name: Check the service account secret
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_UP_WISHLIST }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT" ]; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT_UP_WISHLIST secret is not set. See the 자동 배포 section of web/README.md."
+            exit 1
+          fi
+
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_UP_WISHLIST }}
+          projectId: up-wishlist
+          # The directory holding firebase.json, not the one holding the files it publishes.
+          entryPoint: web
+          # The real site. Left blank this would publish to a throwaway preview channel instead.
+          channelId: live
