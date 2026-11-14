@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arc</title>
+<link rel="icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@400;500;700&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* The app's own palette: warm paper and ink, with the dark set it switches to on a dark device. */
+:root {
+  --paper: #FAF8F4; --surface: #FFFFFF; --band: #EFEAE0; --line: #D6CFC1;
+  --ink: #1E1B16; --muted: #5C574E; --accent: #8E2420;
+  --tint-alpha: 0.13; --chip: #E7E2D8;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #15130F; --surface: #1C1915; --band: #262119; --line: #3A342B;
+    --ink: #EFEAE0; --muted: #9A9286; --accent: #E0693E;
+    --tint-alpha: 0.18; --chip: #2A251D;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: "Gothic A1", system-ui, "Apple SD Gothic Neo", sans-serif;
+  font-size: 14px; -webkit-text-size-adjust: 100%;
+}
+header { padding: 18px 20px 0; }
+.bar { display: flex; align-items: center; gap: 12px; }
+h1 {
+  font-family: "Gowun Batang", Georgia, serif; font-size: 26px; font-weight: 700;
+  margin: 0; flex: 1; letter-spacing: .01em;
+}
+#account { color: var(--muted); font-size: 12px; }
+button {
+  font: inherit; color: var(--ink); background: var(--chip);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+#today { color: var(--muted); font-size: 12px; margin: 14px 0 2px; }
+#summary { font-family: "Gowun Batang", Georgia, serif; font-size: 22px; margin: 0 0 14px; }
+.controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-bottom: 12px; }
+.controls label { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+select { font: inherit; color: var(--ink); background: var(--chip);
+  border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
+.spacer { flex: 1; }
+
+.wrap { overflow-x: auto; padding: 0 20px 48px; }
+table { border-collapse: collapse; width: 100%; min-width: 760px; }
+th {
+  text-align: left; font-weight: 500; font-size: 12px; color: var(--muted);
+  padding: 8px 10px; border-bottom: 1px solid var(--line); background: var(--band);
+  position: sticky; top: 0; z-index: 1; white-space: nowrap;
+}
+td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tbody tr {
+  /* The category stripe and the month wash, the two cues the app's table carries. The tint
+     defaults to the surface itself, so a row with no month mixes to exactly the surface. */
+  --tint: var(--surface);
+  background:
+    linear-gradient(to right, var(--stripe, transparent) 0 3px, transparent 3px),
+    color-mix(in srgb, var(--tint) calc(var(--tint-alpha) * 100%), var(--surface));
+}
+tr.child .major, tr.child .minor { opacity: .45; }
+tr.done td { color: var(--muted); text-decoration: line-through; }
+tr.done .check input { text-decoration: none; }
+.band td {
+  background: var(--band); font-size: 12px; color: var(--muted);
+  border-left: 3px solid transparent; padding: 6px 10px; font-weight: 500;
+}
+.title { font-weight: 500; }
+.sub { color: var(--muted); }
+tr.done .sub, tr.done .title { color: var(--muted); }
+.date, .remaining, .priority { white-space: nowrap; }
+td.remaining { padding-block: 6px; }
+.remaining span[data-urgency] {
+  display: inline-block; padding: 1px 7px; border-radius: 6px; font-size: 12px;
+}
+.remaining span[data-urgency="late"] { background: color-mix(in srgb, #A8443A 30%, transparent); }
+.remaining span[data-urgency="soon"] { background: color-mix(in srgb, #B08A1E 30%, transparent); }
+.check { text-align: center; width: 54px; }
+.check input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+
+#empty { padding: 48px 20px; text-align: center; color: var(--muted); }
+#error {
+  margin: 12px 20px; padding: 10px 12px; border-radius: 8px;
+  background: color-mix(in srgb, #A8443A 24%, transparent); font-size: 13px;
+}
+#gate { padding: 80px 24px; text-align: center; }
+#gate p { color: var(--muted); max-width: 30em; margin: 0 auto 20px; line-height: 1.7; }
+#gate h2 { font-family: "Gowun Batang", Georgia, serif; font-weight: 700; font-size: 20px; }
+
+body[data-signed-in="no"] #app, body[data-signed-in="no"] #signout { display: none; }
+body[data-signed-in="yes"] #gate, body[data-signed-in="yes"] #signin { display: none; }
+
+@media (max-width: 640px) {
+  h1 { font-size: 22px; } #summary { font-size: 18px; }
+  header { padding: 14px 14px 0; } .wrap { padding: 0 14px 40px; }
+  /* The phone has the real app; this is the glance version. 대/중분류 come off so 예정일,
+     남은날짜 and 완료 fit without scrolling — the category is still named by the colour stripe. */
+  table { min-width: 0; }
+  .major, .minor, th:nth-child(1), th:nth-child(2) { display: none; }
+}
+</style>
+</head>
+<body data-signed-in="no">
+
+<header>
+  <div class="bar">
+    <h1>Arc</h1>
+    <span id="account"></span>
+    <button id="signin">Google 계정으로 로그인</button>
+    <button id="signout">로그아웃</button>
+  </div>
+</header>
+
+<div id="error" hidden></div>
+
+<section id="gate">
+  <h2>Arc</h2>
+  <p>폰의 Arc와 같은 Google 계정으로 로그인하면 같은 할 일이 보입니다.
+     한쪽에서 완료를 체크하면 다른 쪽도 바로 바뀝니다.</p>
+  <button onclick="document.getElementById('signin').click()">Google 계정으로 로그인</button>
+</section>
+
+<main id="app">
+  <header style="padding-top:0">
+    <p id="today"></p>
+    <p id="summary"></p>
+    <div class="controls">
+      <label><input type="checkbox" id="hide-completed" checked> 완료항목 숨기기</label>
+      <span class="spacer"></span>
+      <label>정렬 <select id="sort"></select></label>
+      <button id="direction"></button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>대분류</th><th>중분류</th><th>할 일</th><th>세부항목</th>
+          <th>예정일</th><th>남은날짜</th><th>순위</th><th class="check">완료</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p id="empty" hidden></p>
+  </div>
+</main>
+
+<script type="module" src="app.js"></script>
+<script type="module">
+  const d = new Date();
+  const weekday = ['일','월','화','수','목','금','토'][d.getDay()];
+  document.getElementById('today').textContent =
+    `${d.getMonth() + 1}월 ${d.getDate()}일 ${weekday}요일`;
+</script>
+</body>
+</html>
