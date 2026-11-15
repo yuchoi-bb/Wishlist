@@ -231,6 +231,21 @@ body[data-signed-in="yes"] #gate, body[data-signed-in="yes"] #signin { display: 
   </div>
 </dialog>
 
+<!--
+  Hosting's own copies of firebase-auth.js and firebase-firestore.js are mirrors, not self-contained
+  builds: each one imports the shared core straight from gstatic by absolute URL. Pointing our
+  imports at /__/firebase/ therefore removed only the first of the three requests. This remaps that
+  hard-coded URL onto the copy Hosting already serves, so the page resolves every module on its own
+  origin. Must come before the module script — an import map is only read before the first import.
+-->
+<script type="importmap">
+{
+  "imports": {
+    "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js": "/__/firebase/11.0.2/firebase-app.js"
+  }
+}
+</script>
+
 <script type="module" src="app.js"></script>
 <script type="module">
   const d = new Date();
