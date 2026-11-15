@@ -164,6 +164,27 @@ body[data-signed-in="yes"] #gate, body[data-signed-in="yes"] #signin { display: 
 
 <div id="error" hidden></div>
 
+<script>
+  // A module that fails to load runs none of its code, so the page sits on the sign-in screen with
+  // a dead button and nothing said — indistinguishable from "it just doesn't work". These put the
+  // real reason on screen. Registered here, where #error already exists and before the module
+  // below, which is deferred and so runs later.
+  (function () {
+    var show = function (text) {
+      var banner = document.getElementById('error');
+      if (!banner) return;
+      banner.textContent = text;
+      banner.hidden = false;
+    };
+    addEventListener('error', function (event) {
+      if (event.target && event.target.src) show('스크립트를 불러오지 못했습니다: ' + event.target.src);
+    }, true);
+    addEventListener('unhandledrejection', function (event) {
+      show(String((event.reason && event.reason.message) || event.reason));
+    });
+  })();
+</script>
+
 <section id="gate">
   <h2>Arc</h2>
   <p>폰의 Arc와 같은 Google 계정으로 로그인하면 같은 할 일이 보입니다.

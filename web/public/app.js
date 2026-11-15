@@ -5,13 +5,13 @@
  * what it may see — `request.auth.uid == userId` — so signing in as someone else shows their own
  * (empty) list rather than anything of this account's. Nothing in the Android app had to change.
  */
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js';
+import { initializeApp } from '/__/firebase/11.0.2/firebase-app.js';
 import {
   GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut,
-} from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js';
+} from '/__/firebase/11.0.2/firebase-auth.js';
 import {
   addDoc, collection, deleteDoc, doc, getFirestore, onSnapshot, setDoc, updateDoc,
-} from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js';
+} from '/__/firebase/11.0.2/firebase-firestore.js';
 import {
   SORT_FIELDS, buildRows, categoryColor, effectiveEndDate, formatDate, formatRemainingDays,
   formatYearMonth, monthColor, priorityLabel, rowIsDone, daysUntil,
