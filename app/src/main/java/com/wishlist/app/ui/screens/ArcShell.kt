@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TableChart
@@ -60,6 +61,9 @@ import com.wishlist.app.util.formatToday
 @Composable
 fun ArcShell(
     uiState: ArcUiState,
+    /** Name of the linked 할 일 being looked inside, or null at the top of the table. */
+    focusedTitle: String? = null,
+    onBack: () -> Unit = {},
     viewMode: ViewMode,
     onViewModeChange: (ViewMode) -> Unit,
     onHideCompletedChange: (Boolean) -> Unit,
@@ -76,7 +80,15 @@ fun ArcShell(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Arc", style = MaterialTheme.typography.titleLarge) },
+                title = { Text(focusedTitle ?: "Arc", style = MaterialTheme.typography.titleLarge) },
+                navigationIcon = {
+                    // Only inside a link: at the top of the table there is nothing to go back to.
+                    if (focusedTitle != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로")
+                        }
+                    }
+                },
                 actions = {
                     // Reads whatever was copied out of a chat and opens the editor on it. Sits
                     // beside 설정 rather than under the FAB because it starts the same 할 일 the FAB

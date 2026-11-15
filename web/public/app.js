@@ -22,6 +22,8 @@ const $ = (id) => document.getElementById(id);
 const state = {
   items: [], categoryColors: [], sortField: 'END_DATE', ascending: true, hideCompleted: true,
   uid: null, loaded: false,
+  // Linked 할 일 opened so far, outermost first. Empty means the whole table.
+  focusStack: [],
 };
 
 /* ---------------------------------------------------------------- Firebase */
@@ -89,6 +91,7 @@ function readItem(snapshot) {
     memo: d.memo ?? null,
     subItems: (d.subItems ?? []).map((s) => ({
       title: s?.title ?? '', done: s?.done === true, endDate: s?.endDate ?? null,
+      linkedItemId: s?.linkedItemId || null,
     })),
     majorCategory: d.majorCategory ?? null,
     minorCategory: d.minorCategory ?? null,
@@ -112,8 +115,12 @@ async function toggle(row) {
   const patch = row.subIndex < 0
     ? { isDone: !row.item.isDone }
     : {
-      subItems: row.item.subItems.map((s, i) =>
-        ({ title: s.title, done: i === row.subIndex ? !s.done : s.done, endDate: s.endDate })),
+      subItems: row.item.subItems.map((s, i) => ({
+        title: s.title,
+        done: i === row.subIndex ? !s.done : s.done,
+        endDate: s.endDate,
+        linkedItemId: s.linkedItemId ?? null,
+      })),
     };
   await updateDoc(ref, patch).catch(showError);
 }
@@ -125,7 +132,9 @@ async function toggle(row) {
 const toDocument = (item) => ({
   title: item.title,
   memo: item.memo,
-  subItems: item.subItems.map((s) => ({ title: s.title, done: s.done, endDate: s.endDate })),
+  subItems: item.subItems.map((s) => ({
+    title: s.title, done: s.done, endDate: s.endDate, linkedItemId: s.linkedItemId ?? null,
+  })),
   majorCategory: item.majorCategory,
   minorCategory: item.minorCategory,
   startedAt: item.startedAt,
@@ -143,6 +152,7 @@ async function edit(item) {
     (a, b) => a.localeCompare(b, 'ko'));
   const result = await showEditor(item, {
     majorCategories: majors,
+    linkCandidates: state.items,
     minorCategoriesFor: (major) => [...new Set(state.items
       .filter((i) => i.majorCategory === major)
       .map((i) => i.minorCategory)
@@ -167,12 +177,26 @@ async function edit(item) {
 
 const dark = () => matchMedia('(prefers-color-scheme: dark)').matches;
 
+const focusedItem = () => {
+  const id = state.focusStack[state.focusStack.length - 1];
+  return id ? state.items.find((i) => i.id === id) ?? null : null;
+};
+
 function render() {
+  // A target deleted on another device would otherwise strand the page on a title and a table that
+  // no longer have anything behind them.
+  while (state.focusStack.length && state.items.length && !focusedItem()) state.focusStack.pop();
+
+  const focused = focusedItem();
+  $('title').textContent = focused ? focused.title : 'Arc';
+  $('back').hidden = !focused;
+
   $('sort').value = state.sortField;
   $('direction').textContent = state.ascending ? '↑ 오름차순' : '↓ 내림차순';
   $('hide-completed').checked = state.hideCompleted;
 
-  const rows = buildRows(state.items, state);
+  const all = buildRows(state.items, state);
+  const rows = focused ? all.filter((r) => r.item.id === focused.id) : all;
   $('summary').textContent = summary();
 
   const body = $('rows');
@@ -241,9 +265,16 @@ function tableRow(row, isDark) {
   const due = effectiveEndDate(row);
   const done = rowIsDone(row);
 
+  const linkedId = subItem?.linkedItemId ?? null;
+  const linkTarget = linkedId ? state.items.find((i) => i.id === linkedId) : null;
+
   const tr = document.createElement('tr');
   tr.dataset.editable = '';
-  tr.onclick = (e) => { if (!e.target.closest('.check')) edit(item); };
+  tr.onclick = (e) => {
+    if (e.target.closest('.check')) return;
+    // Opening the link is what a tap on it means; the 할 일 it names is edited from its own screen.
+    if (linkTarget) { state.focusStack.push(linkTarget.id); render(); } else { edit(item); }
+  };
   if (done) tr.classList.add('done');
   if (row.grouped && row.subIndex >= 0) tr.classList.add('child');
 
@@ -261,7 +292,11 @@ function tableRow(row, isDark) {
     // Under a grouped sort the 항목 is already its own line above, so repeating it on each child
     // would just be noise.
     cell(row.grouped && row.subIndex >= 0 ? '' : item.title, 'title'),
-    cell(subItem ? subItem.title : (row.subIndex < 0 && item.subItems.length ? '' : '-'), 'sub'),
+    cell(
+      subItem ? subItem.title + (linkedId ? '  \u203a' : '')
+        : (row.subIndex < 0 && item.subItems.length ? '' : '-'),
+      linkedId ? 'sub linked' : 'sub',
+    ),
     cell(formatDate(due), 'date'),
   );
 
@@ -300,6 +335,7 @@ $('hide-completed').onchange = (e) => { state.hideCompleted = e.target.checked; 
 $('sort').onchange = (e) => { state.sortField = e.target.value; render(); };
 $('direction').onclick = () => { state.ascending = !state.ascending; render(); };
 $('fab').onclick = () => edit(null);
+$('back').onclick = () => { state.focusStack.pop(); render(); };
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
 
 for (const field of SORT_FIELDS) {

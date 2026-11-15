@@ -34,6 +34,9 @@ h1 {
   font-family: "Gowun Batang", Georgia, serif; font-size: 26px; font-weight: 700;
   margin: 0; flex: 1; letter-spacing: .01em;
 }
+#back { font-size: 17px; line-height: 1; padding: 6px 11px; }
+/* A step standing for another 할 일 reads as a way in, not as text. */
+.sub.linked { color: var(--ink); font-weight: 500; }
 #account { color: var(--muted); font-size: 12px; }
 button {
   font: inherit; color: var(--ink); background: var(--chip);
@@ -155,7 +158,8 @@ body[data-signed-in="yes"] #gate, body[data-signed-in="yes"] #signin { display: 
 
 <header>
   <div class="bar">
-    <h1>Arc</h1>
+    <button id="back" hidden title="뒤로">←</button>
+    <h1 id="title">Arc</h1>
     <span id="account"></span>
     <button id="signin">Google 계정으로 로그인</button>
     <button id="signout">로그아웃</button>

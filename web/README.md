@@ -22,6 +22,10 @@ about a second.
   A row opens it; 할 일 추가 opens an empty one. 대/중분류 suggest what is already in use, and a
   new 세부항목 inherits the 항목's 최종 종료일, as the app's editor does.
 
+- Linking a 세부항목 to another 할 일 (**할 일 연결** in the editor). The row carries a ›; opening
+  it narrows the table to that 할 일's own steps, and 뒤로 returns. The target stays an ordinary
+  항목 with its own place in the table — a link is a way in, not a second kind of thing.
+
 Dates go in as epoch millis at local midnight, which `new Date(y, m, d)` gives directly — the
 browser is in the same zone as the phone, so nothing has to be converted the way ../mcp does it.
 

@@ -8,6 +8,18 @@ data class SubItem(
     val title: String = "",
     val done: Boolean = false,
     val endDate: Long? = null,
+    /**
+     * The id of another 항목 this step stands for, or null for an ordinary step.
+     *
+     * A linked step is how a 할 일 holds a 할 일: 호주여행계획 can carry 호주여행수영 as one of its
+     * 세부항목, and tapping it opens that item's own 세부항목. The target is a normal 항목 — it keeps
+     * its place in the main table and can be opened from there too, so this adds a way in rather
+     * than a second kind of thing.
+     *
+     * Only the id is stored. [title] is a copy of the target's name taken when the link was made,
+     * which is what the row falls back to while the target is still loading, or once it is gone.
+     */
+    val linkedItemId: String? = null,
 )
 
 /** Stored as a Firestore document under users/{uid}/wishlist_items/{id}; id is "" for a not-yet-saved item. */

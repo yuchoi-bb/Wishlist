@@ -50,7 +50,9 @@ const el = (tag, props = {}, children = []) => {
  * Resolves with {action:'save', item} , {action:'delete'} or null when nothing was decided. The
  * form is compared against the state it opened in, so closing an untouched editor never asks.
  */
-export function showEditor(item, { majorCategories = [], minorCategoriesFor = () => [] } = {}) {
+export function showEditor(item, {
+  majorCategories = [], minorCategoriesFor = () => [], linkCandidates = [],
+} = {}) {
   const draft = item ? structuredClone(item) : blankItem();
   const isNew = !draft.id;
 
@@ -88,7 +90,11 @@ export function showEditor(item, { majorCategories = [], minorCategoriesFor = ()
     draft.subItems.forEach((sub, index) => {
       const done = el('input', { type: 'checkbox', checked: sub.done, ariaLabel: '완료' });
       done.onchange = () => { sub.done = done.checked; };
-      const name = el('input', { type: 'text', value: sub.title, placeholder: '세부항목' });
+      const name = el('input', {
+        type: 'text', value: sub.title,
+        placeholder: sub.linkedItemId ? '연결된 할 일' : '세부항목',
+      });
+      if (sub.linkedItemId) name.title = '다른 할 일로 연결된 세부항목입니다.';
       name.oninput = () => { sub.title = name.value; };
       const date = el('input', { type: 'date', value: millisToIso(sub.endDate) });
       date.onchange = () => { sub.endDate = isoToMillis(date.value); };
@@ -101,6 +107,32 @@ export function showEditor(item, { majorCategories = [], minorCategoriesFor = ()
 
   const newSub = el('input', { type: 'text', placeholder: '세부항목 추가', autocomplete: 'off' });
   const addSub = el('button', { type: 'button', textContent: '추가' });
+
+  /**
+   * Links a step to a 할 일 that already exists rather than naming a new one. The target keeps its
+   * place in the main table — this adds a way in, not a second kind of thing — and its name is
+   * copied so the row still reads sensibly before it loads, or once it is gone.
+   */
+  const linkSub = el('button', { type: 'button', textContent: '할 일 연결' });
+  linkSub.onclick = () => {
+    // Linking an item to itself would make a loop with nowhere to go back to.
+    const choices = linkCandidates.filter((c) => c.id !== draft.id);
+    if (choices.length === 0) { alert('연결할 다른 할 일이 없습니다.'); return; }
+    const lines = choices.map((c, i) => {
+      const category = [c.majorCategory, c.minorCategory].filter(Boolean).join(' › ');
+      return `${i + 1}. ${c.title}${category ? `  (${category})` : ''}`;
+    });
+    const answer = prompt(`연결할 할 일의 번호를 입력하세요.\n\n${lines.join('\n')}`);
+    const picked = choices[Number(answer) - 1];
+    if (!picked) return;
+    draft.subItems.push({
+      title: picked.title,
+      done: false,
+      endDate: picked.endDate ?? isoToMillis(endDate.value),
+      linkedItemId: picked.id,
+    });
+    renderSubs();
+  };
   const commitSub = () => {
     const text = newSub.value.trim();
     if (!text) return;
@@ -125,7 +157,7 @@ export function showEditor(item, { majorCategories = [], minorCategoriesFor = ()
     el('div', { className: 'field' }, [
       el('span', { textContent: '세부항목' }),
       subList,
-      el('div', { className: 'sub-add' }, [newSub, addSub]),
+      el('div', { className: 'sub-add' }, [newSub, addSub, linkSub]),
     ]),
   );
 

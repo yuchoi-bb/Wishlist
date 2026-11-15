@@ -155,6 +155,7 @@ private fun DocumentSnapshot.readSubItems(): List<SubItem> {
             title = entry["title"] as? String ?: "",
             done = entry["done"] as? Boolean ?: false,
             endDate = (entry["endDate"] as? Number)?.toLong(),
+            linkedItemId = (entry["linkedItemId"] as? String)?.takeIf { it.isNotBlank() },
         )
     }
 }
@@ -167,6 +168,10 @@ private fun ArcItem.toFirestoreMap(): Map<String, Any?> = mapOf(
             "title" to it.title,
             "done" to it.done,
             "endDate" to it.endDate?.toStartOfDayMillis(),
+            // Written on every save, including when null. saveItem replaces the whole document, so
+            // a field this map leaves out is dropped from a 할 일 the moment it is edited — which
+            // would quietly cut every link made on the web.
+            "linkedItemId" to it.linkedItemId,
         )
     },
     "majorCategory" to majorCategory,

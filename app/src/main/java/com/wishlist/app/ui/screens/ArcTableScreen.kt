@@ -334,7 +334,16 @@ private fun DataRow(
  * The 세부항목 column: a child line shows its own name, an 항목 line shows how many of its 세부항목
  * are ticked off, and an item with no 세부항목 shows nothing to count.
  */
-private fun subItemLabel(row: TableRow): String = when {
+/**
+ * A step that stands for another 할 일 is marked with a trailing ›, the one hint that tapping it
+ * goes somewhere rather than opening the editor.
+ */
+private fun subItemLabel(row: TableRow): String = linkMarked(row, plainSubItemLabel(row))
+
+private fun linkMarked(row: TableRow, label: String): String =
+    if (row.subItem?.linkedItemId != null) "$label  ›" else label
+
+private fun plainSubItemLabel(row: TableRow): String = when {
     // The └ only makes sense when the parent 항목 is the line right above.
     !row.isItemRow -> if (row.grouped) "└ ${row.subItem?.title.orEmpty()}" else row.subItem?.title.orEmpty()
     row.item.subItems.isEmpty() -> "-"

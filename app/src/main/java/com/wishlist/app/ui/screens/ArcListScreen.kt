@@ -242,7 +242,11 @@ private fun SubRow(
             Checkbox(checked = row.isDone, onCheckedChange = { onToggle() })
         }
         Text(
-            text = label ?: row.subItem?.title.orEmpty(),
+            // Same › as the table uses, so a step that opens another 할 일 reads the same either way.
+            text = label ?: buildString {
+                append(row.subItem?.title.orEmpty())
+                if (row.subItem?.linkedItemId != null) append("  ›")
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = if (label != null || row.isDone) {
                 MaterialTheme.colorScheme.onSurfaceVariant

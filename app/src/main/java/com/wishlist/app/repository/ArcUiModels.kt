@@ -70,6 +70,12 @@ fun List<TableRow>.toItemGroups(): List<ItemGroup> {
 
 data class ArcUiState(
     val rows: List<TableRow> = emptyList(),
+    /**
+     * Every 항목, unsorted and unfiltered. [rows] is what the table shows, so a 항목 whose steps are
+     * all complete drops out of it while 완료항목 숨기기 is on — and a linked 항목 has to be findable
+     * by id to be opened, whether or not it currently has a visible row.
+     */
+    val items: List<ArcItem> = emptyList(),
     val sortField: SortField = SortField.END_DATE,
     val ascending: Boolean = true,
     /** Completed lines are hidden by default; unchecking shows them struck through. */

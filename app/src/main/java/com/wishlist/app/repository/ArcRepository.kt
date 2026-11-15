@@ -69,6 +69,9 @@ class ArcRepository(
      * (완료예정일, 세부항목 이름) orders the rows individually, which is what makes it possible to see
      * every step across the whole list by its due date.
      */
+    /** Every 항목 as stored, for the places that need one by id rather than the table's view of it. */
+    fun observeItems(uid: String): Flow<List<ArcItem>> = firestore.observeItems(uid)
+
     fun observeRows(uid: String, hideCompleted: Flow<Boolean>): Flow<List<TableRow>> =
         combine(
             itemsFlow(uid),

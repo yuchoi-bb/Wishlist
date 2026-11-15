@@ -45,24 +45,28 @@ class ArcViewModel(application: Application) : AndroidViewModel(application) {
             if (uid == null) {
                 flowOf(ArcUiState(isLoading = false))
             } else {
+                // Nested rather than one six-way combine: Kotlin's typed combine stops at five.
                 combine(
-                    repository.observeRows(uid, hideCompleted),
-                    repository.observeSortPreference(),
-                    hideCompleted,
-                    repository.observeCategoryColors(uid),
-                    repository.observeSyncError(),
-                ) { rows, preference, hideDone, colors, syncError ->
-                    ArcUiState(
-                        rows = rows,
-                        sortField = preference.sortField,
-                        ascending = preference.ascending,
-                        hideCompleted = hideDone,
-                        majorCategories = rows.mapNotNull { it.item.majorCategory }.distinct().sorted(),
-                        categoryColors = colors,
-                        syncError = syncError,
-                        isLoading = false,
-                    )
-                }
+                    combine(
+                        repository.observeRows(uid, hideCompleted),
+                        repository.observeSortPreference(),
+                        hideCompleted,
+                        repository.observeCategoryColors(uid),
+                        repository.observeSyncError(),
+                    ) { rows, preference, hideDone, colors, syncError ->
+                        ArcUiState(
+                            rows = rows,
+                            sortField = preference.sortField,
+                            ascending = preference.ascending,
+                            hideCompleted = hideDone,
+                            majorCategories = rows.mapNotNull { it.item.majorCategory }.distinct().sorted(),
+                            categoryColors = colors,
+                            syncError = syncError,
+                            isLoading = false,
+                        )
+                    },
+                    repository.observeItems(uid),
+                ) { state, items -> state.copy(items = items) }
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ArcUiState())

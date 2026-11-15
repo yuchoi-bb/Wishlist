@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -29,6 +30,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -84,6 +86,8 @@ fun AddEditItemDialog(
     viewModel: ArcViewModel,
     majorCategorySuggestions: List<String>,
     categoryColors: List<CategoryColorPref>,
+    /** Every 할 일, offered when a 세부항목 is linked to one instead of being typed out. */
+    linkCandidates: List<ArcItem>,
     editingItem: ArcItem?,
     onDismiss: () -> Unit,
     onSave: (ArcItem) -> Unit,
@@ -110,6 +114,7 @@ fun AddEditItemDialog(
         }
     }
     var newSubItemTitle by remember { mutableStateOf("") }
+    var showLinkPicker by remember { mutableStateOf(false) }
 
     /** Setting the 항목's date also fills in any 세부항목 that still has none. */
     val setItemEndDate: (Long?) -> Unit = { value ->
@@ -279,6 +284,10 @@ fun AddEditItemDialog(
                     ) {
                         Icon(Icons.Filled.Add, contentDescription = "세부항목 추가")
                     }
+                    // Links the step to a 할 일 that already exists instead of naming a new step.
+                    IconButton(onClick = { showLinkPicker = true }) {
+                        Icon(Icons.Filled.Link, contentDescription = "할 일 연결")
+                    }
                 }
                 Spacer(Modifier.height(16.dp))
 
@@ -370,6 +379,22 @@ fun AddEditItemDialog(
                 }
             }
         }
+    }
+
+    if (showLinkPicker) {
+        LinkPicker(
+            // Linking an item to itself would make a loop with nowhere to go back to.
+            candidates = linkCandidates.filter { it.id != editingItem?.id },
+            onPick = { picked ->
+                // The name is copied so the row still reads sensibly before the target loads, or
+                // after it is deleted; the id is what actually opens it.
+                subItems.add(
+                    SubItem(title = picked.title, endDate = picked.endDate ?: endDate, linkedItemId = picked.id),
+                )
+                showLinkPicker = false
+            },
+            onDismiss = { showLinkPicker = false },
+        )
     }
 
     // Declared after the editor so this window sits on top of it.
@@ -600,4 +625,55 @@ private fun CategoryField(
             }
         }
     }
+}
+
+/**
+ * Picks the 할 일 a 세부항목 will stand for.
+ *
+ * A flat list rather than a search box: the point is to reach something already on the main table,
+ * and that table is short enough to scan. Each line carries its (대/중분류) so two 할 일 with
+ * similar names are still told apart.
+ */
+@Composable
+private fun LinkPicker(
+    candidates: List<ArcItem>,
+    onPick: (ArcItem) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("연결할 할 일") },
+        text = {
+            if (candidates.isEmpty()) {
+                Text("연결할 다른 할 일이 없습니다.")
+            } else {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    candidates.forEach { candidate ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onPick(candidate) }
+                                .padding(vertical = 10.dp),
+                        ) {
+                            Text(candidate.title, style = MaterialTheme.typography.bodyLarge)
+                            val category = listOfNotNull(candidate.majorCategory, candidate.minorCategory)
+                                .filter { it.isNotBlank() }
+                                .joinToString(" › ")
+                            if (category.isNotBlank()) {
+                                Text(
+                                    text = category,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        HorizontalDivider()
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("닫기") }
+        },
+    )
 }
