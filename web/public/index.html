@@ -129,6 +129,8 @@ dialog h2 {
 .sub-add { display: flex; gap: 6px; margin-top: 8px; }
 .sub-add input { flex: 1; }
 button.icon { padding: 4px 9px; }
+button.icon:disabled { opacity: .3; cursor: default; }
+#editor-form .sub-row button.icon { flex: 0 0 auto; padding: 4px 7px; }
 .dialog-actions {
   display: flex; gap: 8px; padding: 14px 20px 18px; border-top: 1px solid var(--line); margin-top: 6px;
 }

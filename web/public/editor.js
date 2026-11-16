@@ -100,7 +100,26 @@ export function showEditor(item, {
       date.onchange = () => { sub.endDate = isoToMillis(date.value); };
       const remove = el('button', { type: 'button', textContent: '✕', title: '세부항목 삭제', className: 'icon' });
       remove.onclick = () => { draft.subItems.splice(index, 1); renderSubs(); };
-      subList.append(el('div', { className: 'sub-row' }, [done, name, date, remove]));
+
+      // Order is the order they are stored in, which is the order the table shows them under their
+      // 항목, so moving one here moves it everywhere.
+      const move = (to) => {
+        const [moved] = draft.subItems.splice(index, 1);
+        draft.subItems.splice(to, 0, moved);
+        renderSubs();
+      };
+      const up = el('button', {
+        type: 'button', textContent: '↑', title: '위로', className: 'icon',
+        disabled: index === 0,
+      });
+      up.onclick = () => move(index - 1);
+      const down = el('button', {
+        type: 'button', textContent: '↓', title: '아래로', className: 'icon',
+        disabled: index === draft.subItems.length - 1,
+      });
+      down.onclick = () => move(index + 1);
+
+      subList.append(el('div', { className: 'sub-row' }, [done, name, date, up, down, remove]));
     });
   };
   renderSubs();

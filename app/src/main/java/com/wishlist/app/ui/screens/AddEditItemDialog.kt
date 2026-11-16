@@ -21,6 +21,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
@@ -49,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
@@ -115,6 +118,9 @@ fun AddEditItemDialog(
     }
     var newSubItemTitle by remember { mutableStateOf("") }
     var showLinkPicker by remember { mutableStateOf(false) }
+
+    /** Remove-then-insert, which is how a snapshot list is reordered in place. */
+    val moveSubItem: (Int, Int) -> Unit = { from, to -> subItems.add(to, subItems.removeAt(from)) }
 
     /** Setting the 항목's date also fills in any 세부항목 that still has none. */
     val setItemEndDate: (Long?) -> Unit = { value ->
@@ -258,6 +264,14 @@ fun AddEditItemDialog(
                         parentTitle = title,
                         onChange = { subItems[index] = it },
                         onRemove = { subItems.removeAt(index) },
+                        // Stored order is the order the table shows these under their 항목, so
+                        // moving one here moves it everywhere. Null at the ends greys the arrow.
+                        onMoveUp = if (index > 0) ({ moveSubItem(index, index - 1) }) else null,
+                        onMoveDown = if (index < subItems.lastIndex) {
+                            ({ moveSubItem(index, index + 1) })
+                        } else {
+                            null
+                        },
                     )
                 }
                 Row(
@@ -439,6 +453,8 @@ private fun SubItemEditor(
     parentTitle: String,
     onChange: (SubItem) -> Unit,
     onRemove: () -> Unit,
+    onMoveUp: (() -> Unit)?,
+    onMoveDown: (() -> Unit)?,
 ) {
     val context = LocalContext.current
     var showPicker by remember { mutableStateOf(false) }
@@ -468,6 +484,8 @@ private fun SubItemEditor(
             selected = subItem.endDate,
             onSelect = { onChange(subItem.copy(endDate = it)) },
             leadingContent = {
+                MoveButton(Icons.Filled.KeyboardArrowUp, "위로", onMoveUp)
+                MoveButton(Icons.Filled.KeyboardArrowDown, "아래로", onMoveDown)
                 TextButton(onClick = { showPicker = true }) {
                     Text(
                         text = subItem.endDate?.let(::formatDate) ?: "날짜",
@@ -676,4 +694,16 @@ private fun LinkPicker(
             TextButton(onClick = onDismiss) { Text("닫기") }
         },
     )
+}
+
+/** One of the reorder arrows, shown greyed rather than missing at the ends so the row doesn't jump. */
+@Composable
+private fun MoveButton(icon: ImageVector, label: String, onClick: (() -> Unit)?) {
+    IconButton(
+        onClick = { onClick?.invoke() },
+        enabled = onClick != null,
+        modifier = Modifier.size(32.dp),
+    ) {
+        Icon(icon, contentDescription = label, modifier = Modifier.size(18.dp))
+    }
 }
