@@ -153,6 +153,7 @@ async function edit(item) {
   const result = await showEditor(item, {
     majorCategories: majors,
     linkCandidates: state.items,
+    hideCompletedSubItems: state.hideCompleted,
     minorCategoriesFor: (major) => [...new Set(state.items
       .filter((i) => i.majorCategory === major)
       .map((i) => i.minorCategory)

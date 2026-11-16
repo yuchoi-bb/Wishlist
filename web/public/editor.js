@@ -52,6 +52,9 @@ const el = (tag, props = {}, children = []) => {
  */
 export function showEditor(item, {
   majorCategories = [], minorCategoriesFor = () => [], linkCandidates = [],
+  // Starts wherever 완료항목 숨기기 is set for the table, so the editor opens showing what the
+  // person is already looking at — and can be flipped for this one edit without changing that.
+  hideCompletedSubItems = false,
 } = {}) {
   const draft = item ? structuredClone(item) : blankItem();
   const isNew = !draft.id;
@@ -84,10 +87,27 @@ export function showEditor(item, {
   form.append(field('최종 종료일 (목표일)', endDate));
 
   // 세부항목 ---------------------------------------------------------------
+  const hideDoneSubs = el('input', { type: 'checkbox', checked: hideCompletedSubItems });
+  const hiddenNote = el('span', { className: 'hidden-note' });
   const subList = el('div', { className: 'sub-list' });
+
+  /**
+   * Hiding only changes what is drawn. Every row still carries its real index into draft.subItems,
+   * so a hidden step is never dropped on save, and ↑ ↓ step between *visible* neighbours rather
+   * than by one slot — otherwise a move would look like it did nothing when a completed step sat
+   * in between.
+   */
   const renderSubs = () => {
     subList.replaceChildren();
-    draft.subItems.forEach((sub, index) => {
+    const shown = draft.subItems
+      .map((sub, index) => index)
+      .filter((index) => !hideDoneSubs.checked || !draft.subItems[index].done);
+
+    const buried = draft.subItems.length - shown.length;
+    hiddenNote.textContent = buried > 0 ? `완료 ${buried}개 숨김` : '';
+
+    shown.forEach((index, position) => {
+      const sub = draft.subItems[index];
       const done = el('input', { type: 'checkbox', checked: sub.done, ariaLabel: '완료' });
       done.onchange = () => { sub.done = done.checked; };
       const name = el('input', {
@@ -110,18 +130,19 @@ export function showEditor(item, {
       };
       const up = el('button', {
         type: 'button', textContent: '↑', title: '위로', className: 'icon',
-        disabled: index === 0,
+        disabled: position === 0,
       });
-      up.onclick = () => move(index - 1);
+      up.onclick = () => move(shown[position - 1]);
       const down = el('button', {
         type: 'button', textContent: '↓', title: '아래로', className: 'icon',
-        disabled: index === draft.subItems.length - 1,
+        disabled: position === shown.length - 1,
       });
-      down.onclick = () => move(index + 1);
+      down.onclick = () => move(shown[position + 1]);
 
       subList.append(el('div', { className: 'sub-row' }, [done, name, date, up, down, remove]));
     });
   };
+  hideDoneSubs.onchange = renderSubs;
   renderSubs();
 
   const newSub = el('input', { type: 'text', placeholder: '세부항목 추가', autocomplete: 'off' });
@@ -174,7 +195,11 @@ export function showEditor(item, {
 
   form.append(
     el('div', { className: 'field' }, [
-      el('span', { textContent: '세부항목' }),
+      el('div', { className: 'field-head' }, [
+        el('span', { textContent: '세부항목' }),
+        hiddenNote,
+        el('label', { className: 'hide-done' }, [hideDoneSubs, el('span', { textContent: '완료 숨기기' })]),
+      ]),
       subList,
       el('div', { className: 'sub-add' }, [newSub, addSub, linkSub]),
     ]),

@@ -91,6 +91,8 @@ fun AddEditItemDialog(
     categoryColors: List<CategoryColorPref>,
     /** Every 할 일, offered when a 세부항목 is linked to one instead of being typed out. */
     linkCandidates: List<ArcItem>,
+    /** What 완료항목 숨기기 is set to for the table; the editor's own toggle starts there. */
+    hideCompletedSubItems: Boolean,
     editingItem: ArcItem?,
     onDismiss: () -> Unit,
     onSave: (ArcItem) -> Unit,
@@ -118,6 +120,9 @@ fun AddEditItemDialog(
     }
     var newSubItemTitle by remember { mutableStateOf("") }
     var showLinkPicker by remember { mutableStateOf(false) }
+    // Opens wherever 완료항목 숨기기 is set for the table, so the editor shows what the person is
+    // already looking at — and can be flipped for this one edit without changing that setting.
+    var hideDoneSubItems by remember { mutableStateOf(hideCompletedSubItems) }
 
     /** Remove-then-insert, which is how a snapshot list is reordered in place. */
     val moveSubItem: (Int, Int) -> Unit = { from, to -> subItems.add(to, subItems.removeAt(from)) }
@@ -257,18 +262,48 @@ fun AddEditItemDialog(
                 MonthEndChips(selected = endDate, onSelect = setItemEndDate)
                 Spacer(Modifier.height(16.dp))
 
-                Text("세부항목", style = MaterialTheme.typography.titleSmall)
-                subItems.forEachIndexed { index, subItem ->
+                // Hiding only changes what is drawn here. Every row keeps its real index into
+                // subItems, so a hidden step is still saved, and the arrows step between visible
+                // neighbours — moving past a hidden step would otherwise look like nothing happened.
+                val shown = subItems.indices.filter { !hideDoneSubItems || !subItems[it].done }
+                val buried = subItems.size - shown.size
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("세부항목", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.width(8.dp))
+                    if (buried > 0) {
+                        Text(
+                            text = "완료 ${buried}개 숨김",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        text = "완료 숨기기",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Checkbox(
+                        checked = hideDoneSubItems,
+                        onCheckedChange = { hideDoneSubItems = it },
+                    )
+                }
+
+                shown.forEachIndexed { position, index ->
                     SubItemEditor(
-                        subItem = subItem,
+                        subItem = subItems[index],
                         parentTitle = title,
                         onChange = { subItems[index] = it },
                         onRemove = { subItems.removeAt(index) },
                         // Stored order is the order the table shows these under their 항목, so
                         // moving one here moves it everywhere. Null at the ends greys the arrow.
-                        onMoveUp = if (index > 0) ({ moveSubItem(index, index - 1) }) else null,
-                        onMoveDown = if (index < subItems.lastIndex) {
-                            ({ moveSubItem(index, index + 1) })
+                        onMoveUp = if (position > 0) ({ moveSubItem(index, shown[position - 1]) }) else null,
+                        onMoveDown = if (position < shown.lastIndex) {
+                            ({ moveSubItem(index, shown[position + 1]) })
                         } else {
                             null
                         },

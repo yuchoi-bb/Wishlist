@@ -159,6 +159,7 @@ fun ArcRoot(
             majorCategorySuggestions = uiState.majorCategories,
             categoryColors = uiState.categoryColors,
             linkCandidates = uiState.items,
+            hideCompletedSubItems = uiState.hideCompleted,
             editingItem = editingItem,
             onDismiss = { showAddEdit = false },
             onSave = { item ->
