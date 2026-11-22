@@ -31,6 +31,11 @@ Claude / ChatGPT ──MCP over HTTPS──▶ arc-mcp ──Admin SDK──▶ 
 `Asia/Seoul` unless the phone is elsewhere. Set it wrong and every date reads one day off in the
 app, and 남은날짜 counts down from the wrong one.
 
+A shared 할 일 (one the user has shared with another Google account, or been shared) is listed and
+edited like any other: it lives in `shared_items` rather than the user's own subtree, and this
+server finds it either way. Deleting one is refused unless the user owns it, since that would take
+it from the other person too. The membership check is made here by hand, for the reason below.
+
 **The Admin SDK ignores `firestore.rules`.** Those rules only constrain clients that sign in. This
 process is privileged, so `ARC_MCP_TOKEN` is the only thing between the internet and the items:
 make it long and random, and treat it like a password. `ARC_USER_UID` is fixed by configuration

@@ -47,6 +47,7 @@ import com.wishlist.app.auth.AuthManager
 import com.wishlist.app.backup.DriveBackupManager
 import com.wishlist.app.data.ArcDatabase
 import com.wishlist.app.data.FirestoreArcRepository
+import com.wishlist.app.share.copyToClipboard
 import com.wishlist.app.ui.theme.DeviceSettings
 import com.wishlist.app.ui.theme.ThemeMode
 import com.wishlist.app.ui.theme.ViewMode
@@ -142,6 +143,20 @@ fun SettingsScreen(authManager: AuthManager, onBack: () -> Unit) {
                 user.email ?: user.displayName ?: "uid ${user.uid.take(8)}…"
             } ?: "로그인되지 않음"
             Text("로그인: $accountLabel", style = MaterialTheme.typography.bodySmall)
+
+            // Sharing a 할 일 names the other account by uid, because a client cannot look an
+            // account up by its email address — only a server with the Admin SDK can. So this is
+            // the handle to send whoever wants to be shared something, and to ask them for.
+            currentUser?.uid?.let { myUid ->
+                Text("내 UID: $myUid", style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = {
+                    context.copyToClipboard("Arc UID", myUid)
+                    statusMessage = "UID를 복사했습니다. 할 일을 공유할 상대에게 보내주세요."
+                }) {
+                    Text("내 UID 복사")
+                }
+            }
+
             TextButton(onClick = {
                 GoogleSignIn.getClient(context, GoogleSignInOptions.DEFAULT_SIGN_IN).signOut()
                 authManager.signOut()

@@ -93,10 +93,19 @@ fun AddEditItemDialog(
     linkCandidates: List<ArcItem>,
     /** What 완료항목 숨기기 is set to for the table; the editor's own toggle starts there. */
     hideCompletedSubItems: Boolean,
+    /** The signed-in account, which decides whether a shared 할 일 is this user's to administer. */
+    myUid: String,
     editingItem: ArcItem?,
     onDismiss: () -> Unit,
     onSave: (ArcItem) -> Unit,
     onDelete: (ArcItem) -> Unit,
+    /**
+     * Shares the 할 일 as edited with another account. The item is passed rather than read back from
+     * the list because sharing writes the whole document: going through the form means edits made
+     * in this sitting are saved by the same write instead of being left behind.
+     */
+    onShare: (ArcItem, String) -> Unit,
+    onUnshare: (ArcItem) -> Unit,
 ) {
     val context = LocalContext.current
     var title by remember { mutableStateOf(editingItem?.title.orEmpty()) }
@@ -120,6 +129,7 @@ fun AddEditItemDialog(
     }
     var newSubItemTitle by remember { mutableStateOf("") }
     var showLinkPicker by remember { mutableStateOf(false) }
+    var showSharePicker by remember { mutableStateOf(false) }
     // Opens wherever 완료항목 숨기기 is set for the table, so the editor shows what the person is
     // already looking at — and can be flipped for this one edit without changing that setting.
     var hideDoneSubItems by remember { mutableStateOf(hideCompletedSubItems) }
@@ -164,6 +174,10 @@ fun AddEditItemDialog(
         isDone = isDone,
         priority = priority,
         position = position,
+        // Carried through untouched: this map is written as the whole document, so dropping them
+        // would move a shared 할 일 back into this account's own subtree and end the share.
+        ownerUid = editingItem?.ownerUid ?: "",
+        members = editingItem?.members ?: emptyList(),
     )
 
     // The form as it stood when it opened. Comparing against this — rather than against the stored
@@ -409,13 +423,57 @@ fun AddEditItemDialog(
                     Checkbox(checked = isDone, onCheckedChange = { isDone = it })
                     Text("완료")
                 }
+
+                // Sharing needs a document to share, so it waits until the 할 일 has been saved once.
+                if (editingItem != null && !isNewItem) {
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider()
+                    Spacer(Modifier.height(12.dp))
+
+                    val others = editingItem.members.filter { it != myUid }
+                    val mine = editingItem.isOwnedBy(myUid)
+                    Text("공유", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        text = when {
+                            !editingItem.isShared -> "나만 보는 할 일입니다."
+                            !mine -> "다른 사람이 나와 공유한 할 일입니다. 내용은 함께 고칠 수 있습니다."
+                            others.isEmpty() -> "공유 중이지만 상대가 모두 나갔습니다."
+                            else -> "다른 ${others.size}명과 공유 중입니다. 서로의 체크가 바로 반영됩니다."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    // Enough of each uid to recognise, since that is all the owner has to go on when
+                    // checking they shared with the person they meant to.
+                    if (mine) {
+                        others.forEach { member ->
+                            Text(
+                                text = "· ${member.take(12)}…",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (mine) {
+                            TextButton(onClick = { showSharePicker = true }) { Text("UID로 공유") }
+                        }
+                        if (editingItem.isShared) {
+                            TextButton(onClick = { onUnshare(edited()) }) {
+                                Text(if (mine) "공유 중단" else "공유에서 나가기")
+                            }
+                        }
+                    }
+                }
                 Spacer(Modifier.height(20.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                 ) {
-                    if (editingItem != null && !isNewItem) {
+                    // A guest can edit a shared 할 일 but not delete it: it is not theirs to take
+                    // away from everyone, and Firestore would reject the write anyway.
+                    if (editingItem != null && !isNewItem && editingItem.isOwnedBy(myUid)) {
                         TextButton(onClick = { onDelete(editingItem) }) { Text("삭제") }
                         Spacer(Modifier.width(8.dp))
                     }
@@ -443,6 +501,17 @@ fun AddEditItemDialog(
                 showLinkPicker = false
             },
             onDismiss = { showLinkPicker = false },
+        )
+    }
+
+    if (showSharePicker && editingItem != null) {
+        SharePicker(
+            myUid = myUid,
+            onShare = { withUid ->
+                showSharePicker = false
+                onShare(edited(), withUid)
+            },
+            onDismiss = { showSharePicker = false },
         )
     }
 
@@ -728,6 +797,58 @@ private fun LinkPicker(
         confirmButton = {
             TextButton(onClick = onDismiss) { Text("닫기") }
         },
+    )
+}
+
+/**
+ * Asks for the uid of the account to share with.
+ *
+ * A uid rather than an email address because that is the only name a client can use: Firestore
+ * cannot look an account up by email, and the lookup that could needs the Admin SDK on a server.
+ * The other person reads theirs from 설정 → 내 UID 복사 and sends it across however they like.
+ */
+@Composable
+private fun SharePicker(
+    myUid: String,
+    onShare: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var entered by remember { mutableStateOf("") }
+    val uid = entered.trim()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("UID로 공유") },
+        text = {
+            Column {
+                Text(
+                    "상대방이 Arc에 로그인한 뒤 설정 화면의 「내 UID 복사」로 보내준 값을 넣어주세요.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = entered,
+                    onValueChange = { entered = it },
+                    label = { Text("상대방 UID") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(12.dp))
+                // Nothing here can check the uid: a client may not read another account, so a typo
+                // is accepted and simply shares with nobody.
+                Text(
+                    "UID가 틀리면 아무에게도 보이지 않습니다. 그럴 때는 공유를 중단하고 다시 공유해주세요.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = uid.length >= 8 && uid != myUid && uid.none { it.isWhitespace() },
+                onClick = { onShare(uid) },
+            ) { Text("공유") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
     )
 }
 

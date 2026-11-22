@@ -160,6 +160,7 @@ fun ArcRoot(
             categoryColors = uiState.categoryColors,
             linkCandidates = uiState.items,
             hideCompletedSubItems = uiState.hideCompleted,
+            myUid = currentUser?.uid.orEmpty(),
             editingItem = editingItem,
             onDismiss = { showAddEdit = false },
             onSave = { item ->
@@ -168,6 +169,16 @@ fun ArcRoot(
             },
             onDelete = { item ->
                 viewModel.deleteItem(item)
+                showAddEdit = false
+            },
+            // Both close the editor: the share write carries the whole item, so staying open would
+            // leave a form whose idea of who the 할 일 belongs to is already out of date.
+            onShare = { item, withUid ->
+                viewModel.shareItem(item, withUid)
+                showAddEdit = false
+            },
+            onUnshare = { item ->
+                viewModel.unshareItem(item)
                 showAddEdit = false
             },
         )

@@ -115,6 +115,21 @@ class ArcViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { repository.deleteItem(uid, item) }
     }
 
+    /**
+     * Shares a 할 일, as the editor currently has it, with the account [withUid] names. The write
+     * carries the whole document, so this saves the sitting's edits along with the share.
+     */
+    fun shareItem(item: ArcItem, withUid: String) {
+        val uid = authManager.currentUser.value?.uid ?: return
+        if (withUid.isBlank() || withUid == uid) return
+        viewModelScope.launch { repository.shareItem(uid, item, withUid) }
+    }
+
+    fun unshareItem(item: ArcItem) {
+        val uid = authManager.currentUser.value?.uid ?: return
+        viewModelScope.launch { repository.unshareItem(uid, item) }
+    }
+
     fun toggleSubItem(item: ArcItem, index: Int) {
         val uid = authManager.currentUser.value?.uid ?: return
         val subItem = item.subItems.getOrNull(index) ?: return

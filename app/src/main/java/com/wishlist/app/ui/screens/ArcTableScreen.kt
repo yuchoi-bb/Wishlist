@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.wishlist.app.data.SortField
 import com.wishlist.app.repository.ArcUiState
+import com.wishlist.app.data.ArcItem
 import com.wishlist.app.repository.TableRow
 import com.wishlist.app.ui.theme.Serif
 import com.wishlist.app.ui.theme.dueColors
@@ -282,7 +283,7 @@ private fun DataRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Cell(
-            text = if (isChild) "" else row.item.title,
+            text = if (isChild) "" else itemTitleLabel(row.item),
             width = cols.title,
             cols = cols,
             textStyle = textStyle,
@@ -331,10 +332,15 @@ private fun DataRow(
 }
 
 /**
+ * A 할 일 shared with another account is marked with a trailing ⇄: the arrows go both ways because
+ * either side can tick it, and every member sees the tick.
+ */
+private fun itemTitleLabel(item: ArcItem): String = if (item.isShared) "${item.title}  ⇄" else item.title
+
+/**
  * The 세부항목 column: a child line shows its own name, an 항목 line shows how many of its 세부항목
  * are ticked off, and an item with no 세부항목 shows nothing to count.
- */
-/**
+ *
  * A step that stands for another 할 일 is marked with a trailing ›, the one hint that tapping it
  * goes somewhere rather than opening the editor.
  */

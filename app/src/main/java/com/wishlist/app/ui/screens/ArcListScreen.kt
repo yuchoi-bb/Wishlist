@@ -136,6 +136,16 @@ private fun ItemBlock(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
+                // Its own line of text rather than a suffix on the title, so the one long title
+                // that needs ellipsis doesn't lose the marker along with its tail.
+                if (item.isShared) {
+                    Text(
+                        text = "⇄",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
+                }
                 group.headlineEndDate?.let { date ->
                     Text(
                         text = formatDate(date),

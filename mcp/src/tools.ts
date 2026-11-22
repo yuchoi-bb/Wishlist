@@ -31,13 +31,14 @@ function render(item: StoredItem): string {
   const category = [item.majorCategory, item.minorCategory].filter(Boolean).join(' › ') || '분류 없음';
   const priority = { 1: '높음', 2: '보통', 3: '여유' }[item.priority] ?? '보통';
   const head = [
-    `[${item.id}] ${item.title}${item.isDone ? ' (완료)' : ''}`,
+    `[${item.id}] ${item.title}${item.isDone ? ' (완료)' : ''}${item.shared ? ' (공유)' : ''}`,
     `  분류: ${category} · 순위: ${priority}`,
     `  시작일: ${item.startedAt ?? '-'} · 최종 종료일: ${item.endDate ?? '-'}`,
   ];
   if (item.memo) head.push(`  메모: ${item.memo}`);
   for (const sub of item.subItems) {
-    head.push(`   - [${sub.done ? 'x' : ' '}] ${sub.title}${sub.endDate ? `  예정일 ${sub.endDate}` : ''}`);
+    const link = sub.linkedItemId ? `  → ${sub.linkedItemId}` : '';
+    head.push(`   - [${sub.done ? 'x' : ' '}] ${sub.title}${sub.endDate ? `  예정일 ${sub.endDate}` : ''}${link}`);
   }
   return head.join('\n');
 }

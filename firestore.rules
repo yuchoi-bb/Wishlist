@@ -1,14 +1,50 @@
 rules_version = '2';
 
 // Paste this into Firebase Console > Firestore Database > Rules (or deploy with the Firebase CLI).
-// Each signed-in user can only read/write their own subtree, so one person's items are never
-// visible to another Google account. The wildcard covers everything under users/{userId} —
-// wishlist_items and settings/categoryColors today, and anything added later — under the same
-// owner-only condition.
+//
+// Two places a 할 일 can live:
+//
+//   users/{uid}/wishlist_items/{id}   private, and the normal case
+//   shared_items/{id}                 shared with one or more other Google accounts
+//
+// A 할 일 is in exactly one of them: members is empty for a private item, and holding a non-empty
+// members list is what it means to be shared. Sharing moves the document between the two in a
+// single batch, keeping its id so a 세부항목 linked to it still resolves.
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Each signed-in user can only read/write their own subtree, so one person's items are never
+    // visible to another Google account. The wildcard covers everything under users/{userId} —
+    // wishlist_items and settings/categoryColors today, and anything added later — under the same
+    // owner-only condition.
     match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /shared_items/{itemId} {
+      // Every member reads it and edits its contents: ticking a 세부항목 is the point of sharing.
+      allow read: if request.auth != null && request.auth.uid in resource.data.members;
+
+      // Only ever created by its own owner, and never without them in it — otherwise an item could
+      // be created into someone else's list, or with nobody able to administer it.
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.ownerUid
+        && request.auth.uid in request.resource.data.members;
+
+      // Content is everyone's to change; who may see it is the owner's alone, except that anyone
+      // may take themselves out (공유 중단 for a guest). ownerUid never moves, so an item cannot be
+      // handed over — or taken — by editing it.
+      allow update: if request.auth != null
+        && request.auth.uid in resource.data.members
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && (
+          request.auth.uid == resource.data.ownerUid
+          || request.resource.data.members == resource.data.members
+          || request.resource.data.members == resource.data.members.removeAll([request.auth.uid])
+        );
+
+      // A guest leaving removes themselves from members (the update above); deleting the 할 일
+      // outright is the owner's call, since it would take it away from everyone.
+      allow delete: if request.auth != null && request.auth.uid == resource.data.ownerUid;
     }
   }
 }

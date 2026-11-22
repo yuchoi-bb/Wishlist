@@ -22,7 +22,10 @@ data class SubItem(
     val linkedItemId: String? = null,
 )
 
-/** Stored as a Firestore document under users/{uid}/wishlist_items/{id}; id is "" for a not-yet-saved item. */
+/**
+ * Stored as a Firestore document under users/{uid}/wishlist_items/{id} while it is private, or
+ * shared_items/{id} once it is shared; id is "" for a not-yet-saved item.
+ */
 data class ArcItem(
     val id: String = "",
     val title: String = "",
@@ -49,8 +52,30 @@ data class ArcItem(
      * chosen sort field rather than by hand.
      */
     val position: Long = 0,
+    /**
+     * The uid of whoever owns a shared 할 일, and "" while it is private.
+     *
+     * The owner is the only one who can change [members] or delete the item outright; everyone in
+     * [members] edits its contents, because ticking a 세부항목 is the point of sharing one.
+     */
+    val ownerUid: String = "",
+    /**
+     * Every uid that may see this 할 일, the owner included — and empty for a private one.
+     *
+     * Non-empty is exactly what it means to be shared, and decides where the document lives:
+     * shared_items/{id} when there is a member list, users/{uid}/wishlist_items/{id} when there
+     * isn't. Sharing moves it between the two, keeping its id so a 세부항목 linked to it still
+     * resolves.
+     */
+    val members: List<String> = emptyList(),
 ) {
     val isCompleted: Boolean get() = isDone
+
+    /** True once this 할 일 has a member list, which is also to say it lives in shared_items. */
+    val isShared: Boolean get() = members.isNotEmpty()
+
+    /** Whether [uid] may change who this 할 일 is shared with, or delete it for everyone. */
+    fun isOwnedBy(uid: String): Boolean = !isShared || ownerUid == uid
 
     val doneSubItemCount: Int get() = subItems.count { it.done }
 

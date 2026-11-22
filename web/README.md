@@ -4,10 +4,10 @@ The same table, from the same Firestore, over the same Google sign-in. Open it o
 the eight columns the phone makes you swipe for are all on screen at once.
 
 There is no server. The browser talks to Firestore directly, with the user's own sign-in, and
-`firestore.rules` — `request.auth.uid == userId` — decides what it may see. Signing in as anyone
-else shows their own empty list. **The Android app was not changed for this**, and does not know
-this exists: both ends hold a snapshot listener, so a tick on either shows up on the other within
-about a second.
+`firestore.rules` decides what it may see: a private 할 일 under `users/{uid}` is reachable only by
+that account, a shared one under `shared_items` only by the accounts in its member list. Signing in
+as anyone else shows their own empty list. Both ends hold a snapshot listener, so a tick on either
+shows up on the other within about a second.
 
 ## What it does
 
@@ -29,9 +29,40 @@ about a second.
 - Linking a 세부항목 to another 할 일 (**할 일 연결** in the editor). The row carries a ›; opening
   it narrows the table to that 할 일's own steps, and 뒤로 returns. The target stays an ordinary
   항목 with its own place in the table — a link is a way in, not a second kind of thing.
+- Sharing one 할 일 with another Google account (**공유** in the editor). The row carries a ⇄ and
+  both sides see each other's ticks live. See 공유 below.
 
 Dates go in as epoch millis at local midnight, which `new Date(y, m, d)` gives directly — the
 browser is in the same zone as the phone, so nothing has to be converted the way ../mcp does it.
+
+## 공유 — 한 할 일을 다른 Google 계정과
+
+A 할 일 is private until it is shared, and sharing is per item: nothing else in the account becomes
+visible. Sharing **moves** the document from `users/{uid}/wishlist_items/{id}` to
+`shared_items/{id}`, keeping its id so a 세부항목 linked to it still resolves, and both halves of
+the move go in one batch so the item is never in two places or none.
+
+Who can do what, as `firestore.rules` enforces it:
+
+| | 주인 (ownerUid) | 공유받은 사람 |
+|---|---|---|
+| 내용 보기 · 고치기 · 완료 체크 | ✅ | ✅ |
+| 공유 상대 추가 | ✅ | ❌ |
+| 공유 중단 | ✅ 되가져옴 | ✅ 자기만 빠짐 |
+| 할 일 삭제 | ✅ | ❌ |
+
+**Naming the other account.** A browser cannot look a Google account up by email address — only a
+server holding the Admin SDK can — so the other person is named by their Firebase uid. They read
+theirs from **내 UID 복사** (in the header here, 설정 in the app) and send it over however they like;
+you paste it into **UID로 공유**.
+
+Nothing can check that uid. A typo is accepted and shares with nobody, which looks exactly like a
+share that worked. If the other person doesn't see it, stop sharing and share again.
+
+**Publish the rules first.** `firestore.rules` at the repository root gained the `shared_items`
+block; until it is pasted into Firebase Console → Firestore Database → Rules, every client reports
+`공유 할 일을 읽을 권한이 없습니다` and shares fail. The block only adds a collection, so publishing
+it before the app and the web catch up breaks nothing.
 
 ## Deploying
 
@@ -113,7 +144,7 @@ real project without deploying.
 |---|---|
 | `public/index.html` | Markup and the app's palette, light and dark |
 | `public/table.js` | Rows, sorts, colours, dates — no Firebase, no DOM, so it can be tested alone |
-| `public/app.js` | Firebase wiring and rendering |
+| `public/app.js` | Firebase wiring, sharing, and rendering |
 | `public/config.js` | Fallback settings for running off Hosting |
 
 `table.js` is a second implementation of what `ArcRepository`, `CategoryColors`, `MonthColors` and

@@ -35,6 +35,16 @@ class ArcRepository(
         firestoreRepository?.deleteItem(uid, item)
     }
 
+    /** Shares a saved 할 일 with the account [withUid] names, as [item] currently stands. */
+    suspend fun shareItem(uid: String, item: ArcItem, withUid: String) {
+        firestoreRepository?.shareItem(uid, item, withUid)
+    }
+
+    /** Takes a 할 일 back (owner) or steps out of one shared with this account (everyone else). */
+    suspend fun unshareItem(uid: String, item: ArcItem) {
+        firestoreRepository?.unshareItem(uid, item)
+    }
+
     suspend fun updateSubItems(uid: String, item: ArcItem, subItems: List<SubItem>) {
         firestoreRepository?.saveItem(uid, item.copy(subItems = subItems))
     }

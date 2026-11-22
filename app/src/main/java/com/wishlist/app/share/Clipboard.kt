@@ -1,5 +1,6 @@
 package com.wishlist.app.share
 
+import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.core.content.getSystemService
@@ -23,4 +24,17 @@ fun Context.clipboardText(): String? {
         .joinToString("\n")
         .trim()
         .takeIf { it.isNotBlank() }
+}
+
+/**
+ * Puts [text] on the clipboard under [label].
+ *
+ * Used for the account's own uid, which is the only handle one person can pass another to be shared
+ * a 할 일: a client cannot look an account up by email address, so the uid is typed or pasted, and
+ * twenty-eight characters read off a screen by hand would be a transcription error waiting to
+ * happen.
+ */
+fun Context.copyToClipboard(label: String, text: String) {
+    val manager = getSystemService<ClipboardManager>() ?: return
+    manager.setPrimaryClip(ClipData.newPlainText(label, text))
 }

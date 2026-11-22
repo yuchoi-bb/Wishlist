@@ -2,15 +2,17 @@
  * Arc on the web: the same table, from the same Firestore, over the same sign-in.
  *
  * There is no server here. The browser talks to Firestore directly, and firestore.rules decides
- * what it may see — `request.auth.uid == userId` — so signing in as someone else shows their own
- * (empty) list rather than anything of this account's. Nothing in the Android app had to change.
+ * what it may see: a private 할 일 under `users/{uid}` is reachable only by that account, and a
+ * shared one under `shared_items` only by the accounts named in its members list. Signing in as
+ * someone else shows their own list rather than anything of this account's.
  */
 import { initializeApp } from '/__/firebase/11.0.2/firebase-app.js';
 import {
   GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut,
 } from '/__/firebase/11.0.2/firebase-auth.js';
 import {
-  addDoc, collection, deleteDoc, doc, getFirestore, onSnapshot, setDoc, updateDoc,
+  addDoc, collection, deleteDoc, doc, getFirestore, onSnapshot, query, setDoc, updateDoc,
+  where, writeBatch,
 } from '/__/firebase/11.0.2/firebase-firestore.js';
 import {
   SORT_FIELDS, buildRows, categoryColor, effectiveEndDate, formatDate, formatRemainingDays,
@@ -22,9 +24,24 @@ const $ = (id) => document.getElementById(id);
 const state = {
   items: [], categoryColors: [], sortField: 'END_DATE', ascending: true, hideCompleted: true,
   uid: null, loaded: false,
+  // The two halves the list is built from, each with its own listener: this account's private
+  // items, and the shared ones it is a member of.
+  own: [], shared: [], loadedOwn: false, loadedShared: false,
   // Linked 할 일 opened so far, outermost first. Empty means the whole table.
   focusStack: [],
 };
+
+/**
+ * The two halves as one list. Keyed by id with shared winning, so the moment during a share when
+ * the document exists in both collections shows one row rather than two.
+ */
+function mergeItems() {
+  const byId = new Map();
+  for (const item of state.own) byId.set(item.id, item);
+  for (const item of state.shared) byId.set(item.id, item);
+  state.items = [...byId.values()];
+  state.loaded = state.loadedOwn && state.loadedShared;
+}
 
 /* ---------------------------------------------------------------- Firebase */
 
@@ -53,7 +70,11 @@ async function start() {
   onAuthStateChanged(auth, (user) => {
     state.uid = user?.uid ?? null;
     state.loaded = false;
+    state.loadedOwn = false;
+    state.loadedShared = false;
     state.items = [];
+    state.own = [];
+    state.shared = [];
     $('account').textContent = user?.email ?? '';
     document.body.dataset.signedIn = user ? 'yes' : 'no';
     if (user) subscribe(db, user.uid);
@@ -68,10 +89,33 @@ function subscribe(db, uid) {
   // a refresh.
   unsubscribers = [
     onSnapshot(collection(db, 'users', uid, 'wishlist_items'), (snapshot) => {
-      state.items = snapshot.docs.map(readItem);
-      state.loaded = true;
+      state.own = snapshot.docs.map(readItem);
+      state.loadedOwn = true;
+      mergeItems();
       render();
     }, showError),
+    // Shared 할 일 live outside anybody's subtree, so they are reached by membership rather than by
+    // path. Rejected until firestore.rules carries the shared_items block, which is worth saying in
+    // those words — "Missing or insufficient permissions" names no remedy.
+    onSnapshot(
+      query(collection(db, 'shared_items'), where('members', 'array-contains', uid)),
+      (snapshot) => {
+        state.shared = snapshot.docs.map(readItem);
+        state.loadedShared = true;
+        mergeItems();
+        render();
+      },
+      (error) => {
+        // Still counts as loaded, or the table sits on 불러오는 중… forever over a collection that
+        // is empty for almost everyone.
+        state.loadedShared = true;
+        mergeItems();
+        render();
+        showError(error?.code === 'permission-denied'
+          ? '공유 할 일을 읽을 권한이 없습니다. Firebase 콘솔에서 firestore.rules를 게시해주세요.'
+          : error);
+      },
+    ),
     onSnapshot(doc(db, 'users', uid, 'settings', 'categoryColors'), (snapshot) => {
       state.categoryColors = (snapshot.data()?.entries ?? []).map((e) => ({
         major: e.major, minor: e.minor ?? null, paletteIndex: e.paletteIndex ?? 0,
@@ -100,8 +144,18 @@ function readItem(snapshot) {
     isDone: d.isDone === true,
     priority: typeof d.priority === 'number' ? d.priority : 2,
     position: d.position ?? 0,
+    // Absent on a private 할 일, which is most of them. An empty member list is exactly what says
+    // the document is private, and so which collection it lives in.
+    ownerUid: typeof d.ownerUid === 'string' ? d.ownerUid : '',
+    members: Array.isArray(d.members) ? d.members.filter((m) => typeof m === 'string' && m) : [],
   };
 }
+
+/** True once a 할 일 has a member list, which is also to say it lives in shared_items. */
+const isShared = (item) => (item.members?.length ?? 0) > 0;
+
+/** Whether this account may change who a 할 일 is shared with, or delete it for everyone. */
+const isMine = (item) => !isShared(item) || item.ownerUid === state.uid;
 
 /**
  * Ticking a line, with the same meaning the app gives it: a 세부항목 line flips only that step,
@@ -111,7 +165,7 @@ function readItem(snapshot) {
  * subItems list back — rebuilt from what is on screen, which is the latest snapshot.
  */
 async function toggle(row) {
-  const ref = doc(state.db, 'users', state.uid, 'wishlist_items', row.item.id);
+  const ref = refFor(row.item);
   const patch = row.subIndex < 0
     ? { isDone: !row.item.isDone }
     : {
@@ -142,9 +196,54 @@ const toDocument = (item) => ({
   isDone: item.isDone,
   priority: item.priority,
   position: item.position,
+  // Written on every save so a shared 할 일 edited from either side keeps its member list: this
+  // replaces the whole document, and a field left out of it would end the share silently.
+  ownerUid: item.ownerUid ?? '',
+  members: item.members ?? [],
 });
 
 const itemsRef = () => collection(state.db, 'users', state.uid, 'wishlist_items');
+const sharedRef = () => collection(state.db, 'shared_items');
+
+/** Where this 할 일 is stored, which its member list decides. */
+const refFor = (item) => doc(isShared(item) ? sharedRef() : itemsRef(), item.id);
+
+/**
+ * Shares a 할 일 with another Google account, named by its uid.
+ *
+ * The first share moves the document out of this account's subtree into shared_items, under the
+ * same id so a 세부항목 linked to it still resolves. One batch, so the item is never in both places
+ * (two rows) or neither (lost) — which a write followed by a delete would allow.
+ */
+async function share(item, withUid) {
+  const shared = {
+    ...item,
+    ownerUid: isShared(item) ? item.ownerUid : state.uid,
+    members: [...new Set([state.uid, ...(item.members ?? []), withUid])],
+  };
+  const batch = writeBatch(state.db);
+  batch.set(doc(sharedRef(), item.id), toDocument(shared));
+  if (!isShared(item)) batch.delete(doc(itemsRef(), item.id));
+  await batch.commit();
+}
+
+/**
+ * Stops sharing. The owner takes the 할 일 back — it returns to their own subtree, keeping its id —
+ * while anyone else simply drops out of the member list, leaving it with its owner.
+ */
+async function unshare(item) {
+  if (!isShared(item)) return;
+  if (item.ownerUid === state.uid) {
+    const batch = writeBatch(state.db);
+    batch.set(doc(itemsRef(), item.id), toDocument({ ...item, ownerUid: '', members: [] }));
+    batch.delete(doc(sharedRef(), item.id));
+    await batch.commit();
+  } else {
+    await updateDoc(doc(sharedRef(), item.id), {
+      members: item.members.filter((m) => m !== state.uid),
+    });
+  }
+}
 
 /** Opens the editor on an existing 할 일, or on a new one when given null, and saves the result. */
 async function edit(item) {
@@ -154,6 +253,7 @@ async function edit(item) {
     majorCategories: majors,
     linkCandidates: state.items,
     hideCompletedSubItems: state.hideCompleted,
+    myUid: state.uid,
     minorCategoriesFor: (major) => [...new Set(state.items
       .filter((i) => i.majorCategory === major)
       .map((i) => i.minorCategory)
@@ -163,10 +263,17 @@ async function edit(item) {
 
   try {
     if (result.action === 'delete') {
-      await deleteDoc(doc(itemsRef(), item.id));
+      await deleteDoc(refFor(item));
+    } else if (result.action === 'share') {
+      // The share carries the form as it stands, so edits made in this sitting are saved by the
+      // same write instead of being left behind.
+      await share(result.item, result.uid);
+    } else if (result.action === 'unshare') {
+      await unshare(result.item);
     } else if (result.item.id) {
-      await setDoc(doc(itemsRef(), result.item.id), toDocument(result.item));
+      await setDoc(refFor(result.item), toDocument(result.item));
     } else {
+      // A 할 일 is always born private; sharing it is a separate, deliberate step.
       await addDoc(itemsRef(), toDocument(result.item));
     }
   } catch (error) {
@@ -261,6 +368,21 @@ function cell(text, className) {
   return td;
 }
 
+/**
+ * The 할 일 column. A shared item carries a trailing ⇄ — the arrows go both ways because either
+ * side can tick it and every member sees the tick — and says so on hover, which the phone's table
+ * has no room for.
+ */
+function titleCell(row) {
+  // Under a grouped sort the 항목 is already its own line above, so repeating it on each child
+  // would just be noise.
+  const repeated = row.grouped && row.subIndex >= 0;
+  const shared = isShared(row.item);
+  const td = cell(repeated ? '' : row.item.title + (shared ? '  \u21c4' : ''), 'title');
+  if (!repeated && shared) td.title = '다른 계정과 공유 중인 할 일입니다.';
+  return td;
+}
+
 function tableRow(row, isDark) {
   const { item, subItem } = row;
   const due = effectiveEndDate(row);
@@ -290,9 +412,7 @@ function tableRow(row, isDark) {
   tr.append(
     cell(item.majorCategory ?? '', 'major'),
     cell(item.minorCategory ?? '', 'minor'),
-    // Under a grouped sort the 항목 is already its own line above, so repeating it on each child
-    // would just be noise.
-    cell(row.grouped && row.subIndex >= 0 ? '' : item.title, 'title'),
+    titleCell(row),
     cell(
       subItem ? subItem.title + (linkedId ? '  \u203a' : '')
         : (row.subIndex < 0 && item.subItems.length ? '' : '-'),
@@ -337,6 +457,23 @@ $('sort').onchange = (e) => { state.sortField = e.target.value; render(); };
 $('direction').onclick = () => { state.ascending = !state.ascending; render(); };
 $('fab').onclick = () => edit(null);
 $('back').onclick = () => { state.focusStack.pop(); render(); };
+
+/**
+ * Hands over this account's uid, which is the only name one person can give another to be shared a
+ * 할 일: a browser cannot look an account up by email address. The clipboard can be refused — an
+ * insecure origin, a browser that asks first — so there is a window to copy it out of by hand.
+ */
+$('copy-uid').onclick = async () => {
+  if (!state.uid) return;
+  const button = $('copy-uid');
+  try {
+    await navigator.clipboard.writeText(state.uid);
+    button.textContent = '복사했습니다';
+    setTimeout(() => { button.textContent = '내 UID 복사'; }, 2000);
+  } catch {
+    prompt('이 UID를 할 일을 공유해 줄 상대에게 보내주세요.', state.uid);
+  }
+};
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
 
 for (const field of SORT_FIELDS) {
