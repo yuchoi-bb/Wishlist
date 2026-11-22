@@ -11,7 +11,7 @@ import {
   GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut,
 } from '/__/firebase/11.0.2/firebase-auth.js';
 import {
-  addDoc, collection, deleteDoc, doc, getFirestore, onSnapshot, query, setDoc, updateDoc,
+  addDoc, collection, deleteDoc, doc, getDoc, getFirestore, onSnapshot, query, setDoc, updateDoc,
   where, writeBatch,
 } from '/__/firebase/11.0.2/firebase-firestore.js';
 import {
@@ -77,9 +77,60 @@ async function start() {
     state.shared = [];
     $('account').textContent = user?.email ?? '';
     document.body.dataset.signedIn = user ? 'yes' : 'no';
-    if (user) subscribe(db, user.uid);
+    if (user) {
+      subscribe(db, user.uid);
+      registerEmail(db, user);
+    }
     render();
   });
+}
+
+/**
+ * The name of an address's entry in email_index: the SHA-256 of the lowercased address, in hex.
+ *
+ * Hashing is what keeps the collection from being a list of everybody's email addresses. The rules
+ * allow `get` but not `list`, so an address already known can be looked up while the collection as
+ * a whole cannot be read out — and they check this same hash against the writer's own sign-in
+ * token, so nobody can register an address that isn't theirs.
+ */
+async function emailDigest(email) {
+  const bytes = new TextEncoder().encode(email.trim().toLowerCase());
+  const hash = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Notes this account under its email address, so somebody else can share with it by typing that
+ * address instead of a uid.
+ *
+ * Best-effort and silent: a failure only means sharing falls back to the uid, and the message for a
+ * recipient who cannot be found already says they may not have signed in yet. Reads before writing
+ * because this runs on every page load, and nothing usually changes.
+ */
+async function registerEmail(db, user) {
+  if (!user.email) return;
+  try {
+    const entry = doc(db, 'email_index', await emailDigest(user.email));
+    const stored = await getDoc(entry);
+    if (stored.data()?.uid === user.uid) return;
+    await setDoc(entry, { uid: user.uid });
+  } catch { /* the uid still works */ }
+}
+
+/**
+ * Turns what was typed into the uid that sharing needs: an email address through the directory,
+ * anything else taken as a uid already. Null when no account has registered that address — which,
+ * since the entry is written at sign-in, mostly means they haven't opened Arc yet.
+ */
+async function resolveRecipient(entered) {
+  const trimmed = entered.trim();
+  if (!trimmed.includes('@')) return trimmed || null;
+  try {
+    const entry = await getDoc(doc(state.db, 'email_index', await emailDigest(trimmed)));
+    return entry.data()?.uid ?? null;
+  } catch {
+    return null;
+  }
 }
 
 let unsubscribers = [];
@@ -265,9 +316,17 @@ async function edit(item) {
     if (result.action === 'delete') {
       await deleteDoc(refFor(item));
     } else if (result.action === 'share') {
-      // The share carries the form as it stands, so edits made in this sitting are saved by the
-      // same write instead of being left behind.
-      await share(result.item, result.uid);
+      const withUid = await resolveRecipient(result.recipient);
+      if (!withUid) {
+        showError(new Error(`${result.recipient} 로 가입한 Arc 계정을 찾지 못했습니다. `
+          + '상대가 Arc에 한 번 로그인한 뒤 다시 시도하거나, 상대의 UID를 받아 넣어주세요.'));
+      } else if (withUid === state.uid) {
+        showError(new Error('자기 자신과는 공유할 수 없습니다.'));
+      } else {
+        // The share carries the form as it stands, so edits made in this sitting are saved by the
+        // same write instead of being left behind.
+        await share(result.item, withUid);
+      }
     } else if (result.action === 'unshare') {
       await unshare(result.item);
     } else if (result.item.id) {

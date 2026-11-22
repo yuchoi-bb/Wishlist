@@ -5,6 +5,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Query
 import com.wishlist.app.util.toStartOfDayMillis
+import java.security.MessageDigest
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,6 +50,9 @@ class FirestoreArcRepository(private val firestore: FirebaseFirestore) {
 
     /** Items shared between accounts, outside anybody's subtree because two people own them. */
     private fun sharedCollection() = firestore.collection("shared_items")
+
+    /** Email address → uid, the one lookup a client cannot make through Firebase Auth itself. */
+    private fun emailIndex() = firestore.collection("email_index")
 
     /** Where this 할 일 is stored, which its member list decides. */
     private fun documentFor(uid: String, item: ArcItem) =
@@ -100,6 +104,37 @@ class FirestoreArcRepository(private val firestore: FirebaseFirestore) {
     suspend fun deleteItem(uid: String, item: ArcItem) = guarded("할 일") {
         if (item.id.isNotBlank()) documentFor(uid, item).delete().await()
     }
+
+    /**
+     * Notes this account under its email address, so somebody else can share with it by typing
+     * that address instead of a uid.
+     *
+     * Best-effort and silent: a failure here only means sharing falls back to the uid, and the
+     * message for a recipient who cannot be found already says they may not have signed in yet.
+     * Reads before writing because this runs on every sign-in, and nothing usually changes.
+     */
+    suspend fun registerEmail(uid: String, email: String?) {
+        val address = email?.trim()?.lowercase()?.takeIf { it.contains('@') } ?: return
+        val entry = emailIndex().document(emailDigest(address))
+        val stored = runCatching { entry.get().await() }.getOrNull()
+        if (stored?.getString("uid") == uid) return
+        runCatching { entry.set(mapOf("uid" to uid)).await() }
+    }
+
+    /**
+     * Turns what was typed into the uid that sharing needs: an email address through the directory,
+     * anything else taken as a uid already. Null when no account has registered that address —
+     * which, since the entry is written at sign-in, mostly means they haven't opened Arc yet.
+     */
+    suspend fun resolveRecipient(entered: String): String? {
+        val trimmed = entered.trim()
+        if (!trimmed.contains('@')) return trimmed.takeIf { it.isNotBlank() }
+        val entry = runCatching { emailIndex().document(emailDigest(trimmed)).get().await() }.getOrNull()
+        return entry?.getString("uid")?.takeIf { it.isNotBlank() }
+    }
+
+    /** Puts a message on the sync banner from outside a write, for a share that never got started. */
+    fun reportProblem(what: String, message: String?) = report(what, message)
 
     /**
      * Shares a 할 일 with another Google account, named by its uid.
@@ -191,6 +226,19 @@ class FirestoreArcRepository(private val firestore: FirebaseFirestore) {
     suspend fun getCategoryColorsOnce(uid: String): List<CategoryColorPref> =
         categoryColorsDoc(uid).get().await().readCategoryColors()
 }
+
+/**
+ * The name of an address's entry in email_index: the SHA-256 of the lowercased address, in hex.
+ *
+ * Hashing is what keeps the collection from being a list of everybody's email addresses. The rules
+ * allow `get` but not `list`, so an address already known can be looked up while the collection as
+ * a whole cannot be read out — and they check this same hash against the writer's own sign-in
+ * token, so nobody can register an address that isn't theirs.
+ */
+internal fun emailDigest(email: String): String =
+    MessageDigest.getInstance("SHA-256")
+        .digest(email.trim().lowercase().toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it) }
 
 /**
  * A short Korean explanation of a listener failure. PERMISSION_DENIED is the one worth naming: it

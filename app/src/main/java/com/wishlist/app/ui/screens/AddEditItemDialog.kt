@@ -456,7 +456,7 @@ fun AddEditItemDialog(
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (mine) {
-                            TextButton(onClick = { showSharePicker = true }) { Text("UID로 공유") }
+                            TextButton(onClick = { showSharePicker = true }) { Text("사람 추가") }
                         }
                         if (editingItem.isShared) {
                             TextButton(onClick = { onUnshare(edited()) }) {
@@ -801,11 +801,11 @@ private fun LinkPicker(
 }
 
 /**
- * Asks for the uid of the account to share with.
+ * Asks who to share with: a Google email address, or a uid for someone the directory doesn't know.
  *
- * A uid rather than an email address because that is the only name a client can use: Firestore
- * cannot look an account up by email, and the lookup that could needs the Admin SDK on a server.
- * The other person reads theirs from 설정 → 내 UID 복사 and sends it across however they like.
+ * Firebase Auth cannot be asked for an account by email from a client, so the address is resolved
+ * through email_index, which each account writes itself at sign-in. Anyone who has not opened Arc
+ * since is not in there yet, and the uid they read from 설정 → 내 UID 복사 still works.
  */
 @Composable
 private fun SharePicker(
@@ -814,29 +814,29 @@ private fun SharePicker(
     onDismiss: () -> Unit,
 ) {
     var entered by remember { mutableStateOf("") }
-    val uid = entered.trim()
+    val recipient = entered.trim()
+    val looksLikeEmail = recipient.contains('@') && recipient.substringAfterLast('@').contains('.')
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("UID로 공유") },
+        title = { Text("공유할 사람") },
         text = {
             Column {
                 Text(
-                    "상대방이 Arc에 로그인한 뒤 설정 화면의 「내 UID 복사」로 보내준 값을 넣어주세요.",
+                    "상대방의 Google 계정 이메일을 넣어주세요.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
                     value = entered,
                     onValueChange = { entered = it },
-                    label = { Text("상대방 UID") },
+                    label = { Text("이메일 또는 UID") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(12.dp))
-                // Nothing here can check the uid: a client may not read another account, so a typo
-                // is accepted and simply shares with nobody.
                 Text(
-                    "UID가 틀리면 아무에게도 보이지 않습니다. 그럴 때는 공유를 중단하고 다시 공유해주세요.",
+                    "상대가 Arc에 한 번도 로그인한 적이 없으면 이메일로는 찾을 수 없습니다. " +
+                        "그때는 상대의 설정 화면에 있는 「내 UID 복사」 값을 받아 넣어주세요.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -844,8 +844,10 @@ private fun SharePicker(
         },
         confirmButton = {
             TextButton(
-                enabled = uid.length >= 8 && uid != myUid && uid.none { it.isWhitespace() },
-                onClick = { onShare(uid) },
+                enabled = recipient != myUid &&
+                    recipient.none { it.isWhitespace() } &&
+                    (looksLikeEmail || recipient.length >= 8),
+                onClick = { onShare(recipient) },
             ) { Text("공유") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },

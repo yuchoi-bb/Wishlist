@@ -48,7 +48,7 @@ const el = (tag, props = {}, children = []) => {
 /**
  * Opens the editor on `item`, or on a new 할 일 when it is null.
  *
- * Resolves with {action:'save', item}, {action:'delete'}, {action:'share', item, uid},
+ * Resolves with {action:'save', item}, {action:'delete'}, {action:'share', item, recipient},
  * {action:'unshare', item} or null when nothing was decided. The form is compared against the state
  * it opened in, so closing an untouched editor never asks.
  */
@@ -239,7 +239,7 @@ export function showEditor(item, {
 
   // 공유 ------------------------------------------------------------------
   // Sharing needs a document to share, so it waits until the 할 일 has been saved once.
-  const shareButton = el('button', { type: 'button', textContent: 'UID로 공유' });
+  const shareButton = el('button', { type: 'button', textContent: '사람 추가' });
   const unshareButton = el('button', {
     type: 'button', textContent: mine ? '공유 중단' : '공유에서 나가기',
   });
@@ -291,20 +291,22 @@ export function showEditor(item, {
       if (confirm(`"${draft.title}"을(를) 지울까요? 모든 기기에서 사라집니다.`)) finish({ action: 'delete' });
     };
     /**
-     * A uid rather than an email address because that is the only name a client can use: Firestore
-     * cannot look an account up by email, and the lookup that could needs a server. Nothing here
-     * can check it either, so a typo is accepted and simply shares with nobody.
+     * An email address, or a uid for someone the directory doesn't know. Firebase Auth cannot be
+     * asked for an account by email from a browser, so the caller resolves the address through
+     * email_index, which each account writes itself at sign-in.
      */
     shareButton.onclick = () => {
       const entered = prompt(
-        '상대방이 Arc에서 「내 UID 복사」로 보내준 값을 넣어주세요.\n\n'
-        + 'UID가 틀리면 아무에게도 보이지 않습니다. 그럴 때는 공유를 중단하고 다시 공유해주세요.',
+        '공유할 상대의 Google 계정 이메일을 넣어주세요.\n\n'
+        + '상대가 Arc에 한 번도 로그인한 적이 없으면 이메일로는 찾을 수 없습니다. '
+        + '그때는 상대의 「내 UID 복사」 값을 받아 넣어주세요.',
       );
-      const uid = entered?.trim();
-      if (!uid || uid === myUid || uid.length < 8 || /\s/.test(uid)) return;
+      const recipient = entered?.trim();
+      if (!recipient || recipient === myUid || /\s/.test(recipient)) return;
+      if (!recipient.includes('@') && recipient.length < 8) return;
       // The form as it stands goes with the share: the write carries the whole document, so this
       // saves the sitting's edits rather than leaving them behind.
-      finish({ action: 'share', item: collect(), uid });
+      finish({ action: 'share', item: collect(), recipient });
     };
     unshareButton.onclick = () => finish({ action: 'unshare', item: collect() });
     document.getElementById('editor-cancel').onclick = () => {

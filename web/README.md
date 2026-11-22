@@ -51,18 +51,30 @@ Who can do what, as `firestore.rules` enforces it:
 | 공유 중단 | ✅ 되가져옴 | ✅ 자기만 빠짐 |
 | 할 일 삭제 | ✅ | ❌ |
 
-**Naming the other account.** A browser cannot look a Google account up by email address — only a
-server holding the Admin SDK can — so the other person is named by their Firebase uid. They read
-theirs from **내 UID 복사** (in the header here, 설정 in the app) and send it over however they like;
-you paste it into **UID로 공유**.
+**Naming the other account.** Type their Google email address into **사람 추가**.
 
-Nothing can check that uid. A typo is accepted and shares with nobody, which looks exactly like a
-share that worked. If the other person doesn't see it, stop sharing and share again.
+Firebase Auth cannot be asked for an account by email from a client — only a server holding the
+Admin SDK can — so the address is resolved through `email_index`, a small directory each account
+writes itself at sign-in. A document there is named by the **SHA-256 of the lowercased address**
+and holds nothing but a uid, and the rules allow `get` but never `list`: an address you already
+know can be looked up, while the collection cannot be read out as a list of everybody's email
+addresses. They also check that same hash against the writer's own sign-in token, so an address
+can only ever be registered by the account that owns it.
+
+Two things follow. **The other person has to have opened Arc at least once** — before that they are
+not in the directory and the share says so rather than failing quietly. And a uid still works in
+the same box, for exactly that case: they read theirs from **내 UID 복사** (the header here, 설정 in
+the app) and send it over.
 
 **Publish the rules first.** `firestore.rules` at the repository root gained the `shared_items`
-block; until it is pasted into Firebase Console → Firestore Database → Rules, every client reports
-`공유 할 일을 읽을 권한이 없습니다` and shares fail. The block only adds a collection, so publishing
-it before the app and the web catch up breaks nothing.
+and `email_index` blocks; until it is pasted into Firebase Console → Firestore Database → Rules,
+every client reports `공유 할 일을 읽을 권한이 없습니다` and shares fail. The blocks only add
+collections, so publishing before the app and the web catch up breaks nothing.
+
+The rules are covered by a test against the real rules engine (`@firebase/rules-unit-testing`
+against the Firestore emulator): twenty-three cases, one per claim the table above makes, plus the
+directory's own — that an address can be resolved but the collection cannot be listed, and that
+nobody can register an address that isn't theirs.
 
 ## Deploying
 

@@ -35,6 +35,17 @@ class ArcViewModel(application: Application) : AndroidViewModel(application) {
         ?.let { FirestoreArcRepository(it) }
     private val repository = ArcRepository(firestoreRepository, db.sortPreferenceDao())
 
+    init {
+        // Noting the address at sign-in is what lets somebody else share by typing it. It has to
+        // happen on the owner's own device: the rules check the address against this session's
+        // sign-in token, so no one can be registered by anybody else.
+        viewModelScope.launch {
+            authManager.currentUser.collect { user ->
+                user?.let { repository.registerEmail(it.uid, it.email) }
+            }
+        }
+    }
+
     // On by default: what's left to do is what the table is for. Unchecking brings the finished
     // lines back, struck through, without them ever having been deleted.
     private val hideCompleted = MutableStateFlow(true)
@@ -116,13 +127,25 @@ class ArcViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Shares a 할 일, as the editor currently has it, with the account [withUid] names. The write
-     * carries the whole document, so this saves the sitting's edits along with the share.
+     * Shares a 할 일, as the editor currently has it, with the account [recipient] names — an email
+     * address, or a uid for someone the directory doesn't know. The write carries the whole
+     * document, so this saves the sitting's edits along with the share.
      */
-    fun shareItem(item: ArcItem, withUid: String) {
+    fun shareItem(item: ArcItem, recipient: String) {
         val uid = authManager.currentUser.value?.uid ?: return
-        if (withUid.isBlank() || withUid == uid) return
-        viewModelScope.launch { repository.shareItem(uid, item, withUid) }
+        if (recipient.isBlank()) return
+        viewModelScope.launch {
+            val withUid = repository.resolveRecipient(recipient)
+            when {
+                withUid == null -> repository.reportProblem(
+                    "공유",
+                    "$recipient 로 가입한 Arc 계정을 찾지 못했습니다. 상대가 Arc에 한 번 로그인한 뒤 다시 시도하거나, " +
+                        "상대의 UID를 받아 넣어주세요.",
+                )
+                withUid == uid -> repository.reportProblem("공유", "자기 자신과는 공유할 수 없습니다.")
+                else -> repository.shareItem(uid, item, withUid)
+            }
+        }
     }
 
     fun unshareItem(item: ArcItem) {

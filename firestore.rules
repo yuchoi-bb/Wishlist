@@ -12,6 +12,25 @@ rules_version = '2';
 // single batch, keeping its id so a 세부항목 linked to it still resolves.
 service cloud.firestore {
   match /databases/{database}/documents {
+    // email_index turns an email address into the uid that sharing needs, which a client cannot
+    // otherwise find out — only the Admin SDK can look an account up by email.
+    //
+    // The document is named by the SHA-256 of the lowercased address rather than holding it as a
+    // field, and only `get` is allowed, never `list`. So an address already known can be resolved,
+    // and the collection cannot be read out as a list of everybody's email addresses.
+    match /email_index/{digest} {
+      allow get: if request.auth != null;
+
+      // Only from the account that owns the address: the document name must be the hash of the
+      // email on this user's own sign-in token, so nobody can point someone else's address at
+      // themselves and be shared what was meant for them.
+      allow create, update: if request.auth != null
+        && request.auth.token.email is string
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid'])
+        && digest == hashing.sha256(request.auth.token.email.lower()).toHexString().lower();
+    }
+
     // Each signed-in user can only read/write their own subtree, so one person's items are never
     // visible to another Google account. The wildcard covers everything under users/{userId} —
     // wishlist_items and settings/categoryColors today, and anything added later — under the same

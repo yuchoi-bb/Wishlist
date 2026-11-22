@@ -35,6 +35,20 @@ class ArcRepository(
         firestoreRepository?.deleteItem(uid, item)
     }
 
+    /** Notes this account under its email address so others can share with it by address. */
+    suspend fun registerEmail(uid: String, email: String?) {
+        firestoreRepository?.registerEmail(uid, email)
+    }
+
+    /** An email address or a uid, as typed, turned into the uid sharing needs. Null if unknown. */
+    suspend fun resolveRecipient(entered: String): String? =
+        firestoreRepository?.resolveRecipient(entered)
+
+    /** Puts a message on the sync banner for a share that never got as far as a write. */
+    fun reportProblem(what: String, message: String?) {
+        firestoreRepository?.reportProblem(what, message)
+    }
+
     /** Shares a saved 할 일 with the account [withUid] names, as [item] currently stands. */
     suspend fun shareItem(uid: String, item: ArcItem, withUid: String) {
         firestoreRepository?.shareItem(uid, item, withUid)
