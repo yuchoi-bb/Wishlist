@@ -54,6 +54,11 @@ class ArcRepository(
         firestoreRepository?.shareItem(uid, item, withUid)
     }
 
+    /** Promotes one 세부항목 into its own shared 할 일, leaving a link where it was. */
+    suspend fun sendSubItem(uid: String, parent: ArcItem, index: Int, withUid: String, today: Long) {
+        firestoreRepository?.sendSubItem(uid, parent, index, withUid, today)
+    }
+
     /** Takes a 할 일 back (owner) or steps out of one shared with this account (everyone else). */
     suspend fun unshareItem(uid: String, item: ArcItem) {
         firestoreRepository?.unshareItem(uid, item)
@@ -104,16 +109,19 @@ class ArcRepository(
         ) { items, preference, hideDone ->
             // Completed lines stay in the table struck through by default; hiding them is opt-in.
             val includeCompleted = !hideDone
+            // A linked step shows the 할 일 it stands for, so the rows need every item by id.
+            val byId = items.associateBy { it.id }
             if (preference.sortField.keepsItemTogether) {
-                groupedRows(items, preference, includeCompleted)
+                groupedRows(items, byId, preference, includeCompleted)
             } else {
-                flatRows(items, preference, includeCompleted)
+                flatRows(items, byId, preference, includeCompleted)
             }
         }
 
     /** 항목 line + its own 세부항목 lines, with the items themselves ordered by the sort field. */
     private fun groupedRows(
         items: List<ArcItem>,
+        byId: Map<String, ArcItem>,
         preference: SortPreference,
         includeCompleted: Boolean,
     ): List<TableRow> {
@@ -121,7 +129,9 @@ class ArcRepository(
         return items.sortedWith(if (preference.ascending) comparator else comparator.reversed())
             .flatMap { item ->
                 val block = listOf(TableRow(item, subItem = null, subIndex = -1, grouped = true)) +
-                    item.subItems.mapIndexed { index, sub -> TableRow(item, sub, index, grouped = true) }
+                    item.subItems.mapIndexed { index, sub ->
+                        TableRow(item, sub, index, grouped = true, linkedDone = byId.doneOf(sub))
+                    }
                 block.filter { includeCompleted || !it.isDone }
             }
     }
@@ -129,6 +139,7 @@ class ArcRepository(
     /** One line per 세부항목 across every item, ordered on its own. */
     private fun flatRows(
         items: List<ArcItem>,
+        byId: Map<String, ArcItem>,
         preference: SortPreference,
         includeCompleted: Boolean,
     ): List<TableRow> {
@@ -138,7 +149,9 @@ class ArcRepository(
                 // Nothing to break out, so the 항목 stands in for itself instead of disappearing.
                 listOf(TableRow(item, subItem = null, subIndex = -1))
             } else {
-                item.subItems.mapIndexed { index, sub -> TableRow(item, sub, index) }
+                item.subItems.mapIndexed { index, sub ->
+                    TableRow(item, sub, index, linkedDone = byId.doneOf(sub))
+                }
             }
         }
             .filter { includeCompleted || !it.isDone }
@@ -187,6 +200,14 @@ class ArcRepository(
             .thenBy { it.subIndex }
     }
 }
+
+/**
+ * The 완료 of the 할 일 a step stands for, or null for an ordinary step — and also null while the
+ * target is still loading or once it is gone, where the row falls back to its own flag rather than
+ * reading as finished.
+ */
+private fun Map<String, ArcItem>.doneOf(sub: SubItem): Boolean? =
+    sub.linkedItemId?.let { this[it]?.isDone }
 
 /** Blank 대분류/중분류 sort after everything named, instead of leading the list. */
 private fun String?.sortKey(): String = this?.takeIf { it.isNotBlank() } ?: "￿"

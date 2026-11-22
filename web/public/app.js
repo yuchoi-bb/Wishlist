@@ -216,6 +216,16 @@ const isMine = (item) => !isShared(item) || item.ownerUid === state.uid;
  * subItems list back — rebuilt from what is on screen, which is the latest snapshot.
  */
 async function toggle(row) {
+  // A linked step is a view of the 할 일 it names, so ticking it ticks that 할 일 — the one place
+  // the state lives, and the only place the person it was sent to can see it.
+  const linkedId = row.subItem?.linkedItemId;
+  if (linkedId) {
+    const target = state.items.find((i) => i.id === linkedId);
+    if (!target) return;
+    await updateDoc(refFor(target), { isDone: !target.isDone }).catch(showError);
+    return;
+  }
+
   const ref = refFor(row.item);
   const patch = row.subIndex < 0
     ? { isDone: !row.item.isDone }
@@ -278,6 +288,55 @@ async function share(item, withUid) {
   await batch.commit();
 }
 
+/** Local midnight today, which is how every date in a document is stored. */
+const todayMillis = () => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+};
+
+/**
+ * Sends one 세부항목 to another account, leaving the rest of the 할 일 private.
+ *
+ * A 세부항목 is an element of an array inside a document, so it cannot be shared on its own. What
+ * it can do is become a 할 일, which is what linkedItemId has meant since links were added. So the
+ * step is promoted into its own 할 일, born straight into shared_items with the recipient in it,
+ * and the step it came from is left pointing at it.
+ *
+ * One batch, so the parent is never left pointing at a 할 일 that was not created — a link to
+ * nothing, which the table would quietly draw as an ordinary step.
+ */
+async function sendSubItem(parent, index, withUid) {
+  const step = parent.subItems[index];
+  if (!step || step.linkedItemId) return;
+
+  // Generated here rather than by addDoc, because the parent has to point at it in the same batch.
+  const childRef = doc(sharedRef());
+  const child = {
+    title: step.title,
+    // Where it came from, since the recipient gets the step and not the 할 일 around it.
+    memo: `「${parent.title}」의 세부항목`,
+    subItems: [],
+    majorCategory: parent.majorCategory,
+    minorCategory: parent.minorCategory,
+    startedAt: todayMillis(),
+    endDate: step.endDate ?? parent.endDate,
+    isDone: step.done,
+    priority: parent.priority,
+    position: Date.now(),
+    ownerUid: state.uid,
+    members: [...new Set([state.uid, withUid])],
+  };
+  const linked = {
+    ...parent,
+    subItems: parent.subItems.map((s, at) => (at === index ? { ...s, linkedItemId: childRef.id } : s)),
+  };
+
+  const batch = writeBatch(state.db);
+  batch.set(childRef, toDocument(child));
+  batch.set(refFor(linked), toDocument(linked));
+  await batch.commit();
+}
+
 /**
  * Stops sharing. The owner takes the 할 일 back — it returns to their own subtree, keeping its id —
  * while anyone else simply drops out of the member list, leaving it with its owner.
@@ -329,6 +388,16 @@ async function edit(item) {
       }
     } else if (result.action === 'unshare') {
       await unshare(result.item);
+    } else if (result.action === 'send') {
+      const withUid = await resolveRecipient(result.recipient);
+      if (!withUid) {
+        showError(new Error(`${result.recipient} 로 가입한 Arc 계정을 찾지 못했습니다. `
+          + '상대가 Arc에 한 번 로그인한 뒤 다시 시도하거나, 상대의 UID를 받아 넣어주세요.'));
+      } else if (withUid === state.uid) {
+        showError(new Error('자기 자신에게는 보낼 수 없습니다.'));
+      } else {
+        await sendSubItem(result.item, result.index, withUid);
+      }
     } else if (result.item.id) {
       await setDoc(refFor(result.item), toDocument(result.item));
     } else {

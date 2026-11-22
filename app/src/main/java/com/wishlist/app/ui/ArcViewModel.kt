@@ -12,6 +12,7 @@ import com.wishlist.app.data.FirestoreArcRepository
 import com.wishlist.app.data.SortField
 import com.wishlist.app.repository.ArcRepository
 import com.wishlist.app.repository.ArcUiState
+import com.wishlist.app.util.todayStartOfDayMillis
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -156,8 +157,42 @@ class ArcViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleSubItem(item: ArcItem, index: Int) {
         val uid = authManager.currentUser.value?.uid ?: return
         val subItem = item.subItems.getOrNull(index) ?: return
+
+        // A linked step is a view of the 할 일 it names, so ticking it ticks that 할 일 — the one
+        // place the state lives, and the only place the person it was sent to can see it.
+        val linkedId = subItem.linkedItemId
+        if (linkedId != null) {
+            val target = uiState.value.items.firstOrNull { it.id == linkedId } ?: return
+            viewModelScope.launch { repository.saveItem(uid, target.copy(isDone = !target.isDone)) }
+            return
+        }
+
         val updated = item.subItems.toMutableList().apply { this[index] = subItem.copy(done = !subItem.done) }
         viewModelScope.launch { repository.updateSubItems(uid, item, updated) }
+    }
+
+    /**
+     * Sends one 세부항목 of [parent] to another account: it becomes a 할 일 of its own, shared with
+     * them, and the step it came from is left pointing at it.
+     *
+     * [parent] is the form as it stands rather than what is stored, because the write replaces the
+     * whole document — the same reason sharing takes it that way.
+     */
+    fun sendSubItem(parent: ArcItem, index: Int, recipient: String) {
+        val uid = authManager.currentUser.value?.uid ?: return
+        if (recipient.isBlank()) return
+        viewModelScope.launch {
+            val withUid = repository.resolveRecipient(recipient)
+            when {
+                withUid == null -> repository.reportProblem(
+                    "세부항목 보내기",
+                    "$recipient 로 가입한 Arc 계정을 찾지 못했습니다. 상대가 Arc에 한 번 로그인한 뒤 다시 시도하거나, " +
+                        "상대의 UID를 받아 넣어주세요.",
+                )
+                withUid == uid -> repository.reportProblem("세부항목 보내기", "자기 자신에게는 보낼 수 없습니다.")
+                else -> repository.sendSubItem(uid, parent, index, withUid, todayStartOfDayMillis())
+            }
+        }
     }
 
     /** For the item-only row, where there is no 세부항목 to tick. */

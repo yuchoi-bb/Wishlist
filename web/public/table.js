@@ -117,7 +117,10 @@ const collator = new Intl.Collator('ko');
 const sortKey = (value) => (value ?? '').trim() || '￿';
 
 const effectiveEndDate = (row) => row.subItem?.endDate ?? row.item.endDate ?? null;
-const rowIsDone = (row) => row.item.isDone || (row.subItem?.done ?? false);
+// A linked step shows the 완료 of the 할 일 it stands for — see linkedDone in buildRows. The
+// fallback matters while that 할 일 is still loading, or once it is gone: the row reads its own
+// flag rather than reading as finished.
+const rowIsDone = (row) => row.item.isDone || (row.linkedDone ?? row.subItem?.done ?? false);
 
 function itemComparator(field) {
   const byField = {
@@ -156,13 +159,25 @@ export function buildRows(items, { sortField = 'END_DATE', ascending = true, hid
   const sign = ascending ? 1 : -1;
   const visible = (row) => !hideCompleted || !rowIsDone(row);
 
+  // A link is a view of the thing it names, so the one place its 완료 can live is the 할 일 itself.
+  // It matters most for a step sent to somebody else: they finish their copy, and the row it was
+  // sent from has to say so.
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const step = (item, subItem, subIndex, grouped) => ({
+    item,
+    subItem,
+    subIndex,
+    grouped,
+    linkedDone: subItem?.linkedItemId ? byId.get(subItem.linkedItemId)?.isDone ?? null : null,
+  });
+
   if (keepsTogether) {
     const cmp = itemComparator(sortField);
     return [...items]
       .sort((a, b) => sign * cmp(a, b))
       .flatMap((item) => [
-        { item, subItem: null, subIndex: -1, grouped: true },
-        ...item.subItems.map((subItem, subIndex) => ({ item, subItem, subIndex, grouped: true })),
+        { item, subItem: null, subIndex: -1, grouped: true, linkedDone: null },
+        ...item.subItems.map((subItem, subIndex) => step(item, subItem, subIndex, true)),
       ].filter(visible));
   }
 
@@ -171,8 +186,8 @@ export function buildRows(items, { sortField = 'END_DATE', ascending = true, hid
     .flatMap((item) =>
       // Nothing to break out, so the 항목 stands in for itself rather than disappearing.
       item.subItems.length === 0
-        ? [{ item, subItem: null, subIndex: -1, grouped: false }]
-        : item.subItems.map((subItem, subIndex) => ({ item, subItem, subIndex, grouped: false })))
+        ? [{ item, subItem: null, subIndex: -1, grouped: false, linkedDone: null }]
+        : item.subItems.map((subItem, subIndex) => step(item, subItem, subIndex, false)))
     .filter(visible)
     .sort((a, b) => sign * cmp(a, b));
 }

@@ -23,6 +23,15 @@ data class TableRow(
     val subIndex: Int,
     /** True when this line is part of an 항목 block rather than a standalone 세부항목 line. */
     val grouped: Boolean = false,
+    /**
+     * For a step that stands for another 할 일, that 할 일's own 완료 — which this line shows
+     * instead of the step's own flag, and which ticking it writes to.
+     *
+     * A link is a view of the thing it names, so the one place the state can live is the 할 일
+     * itself. It matters most for a step sent to somebody else: they finish their copy, and the
+     * row it was sent from has to say so.
+     */
+    val linkedDone: Boolean? = null,
 ) {
     val isItemRow: Boolean get() = subIndex < 0
 
@@ -32,7 +41,7 @@ data class TableRow(
     val effectiveEndDate: Long? get() = subItem?.endDate ?: item.endDate
 
     /** A line counts as done when its own 세부항목 is ticked, or the whole item is complete. */
-    val isDone: Boolean get() = item.isDone || (subItem?.done ?: false)
+    val isDone: Boolean get() = item.isDone || (linkedDone ?: (subItem?.done ?: false))
 }
 
 /**

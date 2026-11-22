@@ -49,7 +49,8 @@ const el = (tag, props = {}, children = []) => {
  * Opens the editor on `item`, or on a new 할 일 when it is null.
  *
  * Resolves with {action:'save', item}, {action:'delete'}, {action:'share', item, recipient},
- * {action:'unshare', item} or null when nothing was decided. The form is compared against the state
+ * {action:'unshare', item}, {action:'send', item, index, recipient} or null when nothing was
+ * decided. The form is compared against the state
  * it opened in, so closing an untouched editor never asks.
  */
 export function showEditor(item, {
@@ -100,6 +101,9 @@ export function showEditor(item, {
   const hideDoneSubs = el('input', { type: 'checkbox', checked: hideCompletedSubItems });
   const hiddenNote = el('span', { className: 'hidden-note' });
   const subList = el('div', { className: 'sub-list' });
+  // Assigned when the promise below starts. The 세부항목 rows are drawn before that and need to be
+  // able to close the editor, so this is a binding they can reach rather than one they capture.
+  let finish = () => {};
 
   /**
    * Hiding only changes what is drawn. Every row still carries its real index into draft.subItems,
@@ -118,7 +122,17 @@ export function showEditor(item, {
 
     shown.forEach((index, position) => {
       const sub = draft.subItems[index];
-      const done = el('input', { type: 'checkbox', checked: sub.done, ariaLabel: '완료' });
+      // A linked step is a view of the 할 일 it names, so its 완료 belongs to that 할 일 and is
+      // ticked there — on its own row in the table, or by whoever it was sent to.
+      const target = sub.linkedItemId
+        ? linkCandidates.find((c) => c.id === sub.linkedItemId) ?? null
+        : null;
+      const done = el('input', {
+        type: 'checkbox',
+        checked: target ? target.isDone : sub.done,
+        ariaLabel: '완료',
+        disabled: Boolean(sub.linkedItemId),
+      });
       done.onchange = () => { sub.done = done.checked; };
       const name = el('input', {
         type: 'text', value: sub.title,
@@ -149,7 +163,29 @@ export function showEditor(item, {
       });
       down.onclick = () => move(shown[position + 1]);
 
-      subList.append(el('div', { className: 'sub-row' }, [done, name, date, up, down, remove]));
+      // Hands this one step to a person rather than to an app: it becomes a 할 일 of its own,
+      // shared with them, and this row is left pointing at it. Needs a 할 일 that exists to hang
+      // the link on, and a step that is not already standing for one.
+      const sendable = !isNew && !sub.linkedItemId;
+      const send = el('button', {
+        type: 'button', textContent: '↗', title: '사람에게 보내기', className: 'icon',
+      });
+      send.onclick = () => {
+        const entered = prompt(
+          `「${sub.title}」을(를) 보낼 상대의 Google 계정 이메일을 넣어주세요.\n\n`
+          + '이 세부항목만 상대에게 갑니다. 나머지 할 일은 보이지 않습니다.',
+        );
+        const recipient = entered?.trim();
+        if (!recipient || recipient === myUid || /\s/.test(recipient)) return;
+        if (!recipient.includes('@') && recipient.length < 8) return;
+        // Closes with it: the write replaces this 할 일's document, so an editor left open would
+        // save a copy with no link in it the next time 저장 was pressed.
+        finish({ action: 'send', item: collect(), index, recipient });
+      };
+
+      subList.append(el('div', { className: 'sub-row' }, [
+        done, name, date, up, down, ...(sendable ? [send] : []), remove,
+      ]));
     });
   };
   hideDoneSubs.onchange = renderSubs;
@@ -277,7 +313,7 @@ export function showEditor(item, {
   const opened = JSON.stringify(collect());
 
   return new Promise((resolve) => {
-    const finish = (result) => {
+    finish = (result) => {
       dialog.close();
       dialog.onclose = null;
       resolve(result);

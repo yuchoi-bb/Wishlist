@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.PersonAddAlt
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -106,6 +107,8 @@ fun AddEditItemDialog(
      */
     onShare: (ArcItem, String) -> Unit,
     onUnshare: (ArcItem) -> Unit,
+    /** Sends one 세부항목 of the 할 일 as edited to another account, by index into its steps. */
+    onSendSubItem: (ArcItem, Int, String) -> Unit,
 ) {
     val context = LocalContext.current
     var title by remember { mutableStateOf(editingItem?.title.orEmpty()) }
@@ -130,6 +133,7 @@ fun AddEditItemDialog(
     var newSubItemTitle by remember { mutableStateOf("") }
     var showLinkPicker by remember { mutableStateOf(false) }
     var showSharePicker by remember { mutableStateOf(false) }
+    var sendingSubItem by remember { mutableStateOf<Int?>(null) }
     // Opens wherever 완료항목 숨기기 is set for the table, so the editor shows what the person is
     // already looking at — and can be flipped for this one edit without changing that setting.
     var hideDoneSubItems by remember { mutableStateOf(hideCompletedSubItems) }
@@ -311,6 +315,17 @@ fun AddEditItemDialog(
                     SubItemEditor(
                         subItem = subItems[index],
                         parentTitle = title,
+                        // A linked step shows the 완료 of the 할 일 it stands for; its own flag is
+                        // not what the table reads either.
+                        linkedDone = subItems[index].linkedItemId
+                            ?.let { id -> linkCandidates.firstOrNull { it.id == id }?.isDone },
+                        // Sending needs a 할 일 that exists to hang the link on, and a step that is
+                        // not already standing for one.
+                        onSend = if (!isNewItem && subItems[index].linkedItemId == null) {
+                            ({ sendingSubItem = index })
+                        } else {
+                            null
+                        },
                         onChange = { subItems[index] = it },
                         onRemove = { subItems.removeAt(index) },
                         // Stored order is the order the table shows these under their 항목, so
@@ -506,12 +521,27 @@ fun AddEditItemDialog(
 
     if (showSharePicker && editingItem != null) {
         SharePicker(
+            heading = "공유할 사람",
             myUid = myUid,
             onShare = { withUid ->
                 showSharePicker = false
                 onShare(edited(), withUid)
             },
             onDismiss = { showSharePicker = false },
+        )
+    }
+
+    sendingSubItem?.let { index ->
+        SharePicker(
+            heading = "이 세부항목을 보낼 사람",
+            myUid = myUid,
+            onShare = { withUid ->
+                sendingSubItem = null
+                // Closes with it: the write replaces this 할 일's document, so an editor left open
+                // would save a copy with no link in it the next time 저장 was pressed.
+                onSendSubItem(edited(), index, withUid)
+            },
+            onDismiss = { sendingSubItem = null },
         )
     }
 
@@ -555,6 +585,10 @@ private fun SubItemEditor(
     subItem: SubItem,
     /** Prefixes what gets handed off, so "장보기" from "생일 준비" doesn't lose its context. */
     parentTitle: String,
+    /** For a step standing for another 할 일: that 할 일's 완료, which is the state this shows. */
+    linkedDone: Boolean?,
+    /** Hands this one step to another account; null when there is nothing to hang a link on. */
+    onSend: (() -> Unit)?,
     onChange: (SubItem) -> Unit,
     onRemove: () -> Unit,
     onMoveUp: (() -> Unit)?,
@@ -568,8 +602,11 @@ private fun SubItemEditor(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // A linked step is a view of the 할 일 it names, so its 완료 belongs to that 할 일 and
+            // is ticked there — on its own row in the table, or by whoever it was sent to.
             Checkbox(
-                checked = subItem.done,
+                checked = linkedDone ?: subItem.done,
+                enabled = subItem.linkedItemId == null,
                 onCheckedChange = { onChange(subItem.copy(done = it)) },
             )
             OutlinedTextField(
@@ -612,6 +649,13 @@ private fun SubItemEditor(
                     },
                 ) {
                     Icon(Icons.Filled.Share, contentDescription = "할 일 앱으로 보내기")
+                }
+                // Hands this one step to a person rather than to an app: it becomes a 할 일 of its
+                // own, shared with them, and this row is left pointing at it.
+                onSend?.let { send ->
+                    IconButton(enabled = subItem.title.isNotBlank(), onClick = send) {
+                        Icon(Icons.Filled.PersonAddAlt, contentDescription = "사람에게 보내기")
+                    }
                 }
                 if (due != null) {
                     IconButton(
@@ -809,6 +853,7 @@ private fun LinkPicker(
  */
 @Composable
 private fun SharePicker(
+    heading: String,
     myUid: String,
     onShare: (String) -> Unit,
     onDismiss: () -> Unit,
@@ -818,7 +863,7 @@ private fun SharePicker(
     val looksLikeEmail = recipient.contains('@') && recipient.substringAfterLast('@').contains('.')
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("공유할 사람") },
+        title = { Text(heading) },
         text = {
             Column {
                 Text(

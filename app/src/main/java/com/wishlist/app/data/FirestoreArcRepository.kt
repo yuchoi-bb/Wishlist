@@ -156,6 +156,59 @@ class FirestoreArcRepository(private val firestore: FirebaseFirestore) {
     }
 
     /**
+     * Sends one 세부항목 to another account, leaving the rest of the 할 일 private.
+     *
+     * A 세부항목 is an element of an array inside a document, so it cannot be shared on its own.
+     * What it can do is become a 할 일 — which is what [SubItem.linkedItemId] has meant since
+     * links were added. So the step is promoted into its own 할 일, born straight into shared_items
+     * with the recipient in it, and the step it came from is left pointing at it. The person it
+     * went to sees that one 할 일 and nothing else; the sender sees the same row as before, now
+     * carrying the › that opens it.
+     *
+     * One batch, so the parent is never left pointing at a 할 일 that was not created — a link to
+     * nothing, which the table would quietly draw as an ordinary step.
+     */
+    suspend fun sendSubItem(
+        uid: String,
+        parent: ArcItem,
+        index: Int,
+        withUid: String,
+        today: Long,
+    ) = guarded("세부항목 보내기") {
+        val step = parent.subItems.getOrNull(index) ?: return@guarded
+        if (parent.id.isBlank() || step.linkedItemId != null) return@guarded
+
+        // Generated here rather than by add(), because the parent has to point at it in the same
+        // batch that creates it.
+        val childRef = sharedCollection().document()
+        val child = ArcItem(
+            id = childRef.id,
+            title = step.title,
+            // Where it came from, since the recipient gets the step and not the 할 일 around it.
+            memo = "「${parent.title}」의 세부항목",
+            majorCategory = parent.majorCategory,
+            minorCategory = parent.minorCategory,
+            startedAt = today,
+            endDate = step.endDate ?: parent.endDate,
+            isDone = step.done,
+            priority = parent.priority,
+            position = System.currentTimeMillis(),
+            ownerUid = uid,
+            members = listOf(uid, withUid).distinct(),
+        )
+        val linked = parent.copy(
+            subItems = parent.subItems.mapIndexed { at, existing ->
+                if (at == index) existing.copy(linkedItemId = childRef.id) else existing
+            },
+        )
+
+        val batch = firestore.batch()
+        batch.set(childRef, child.toFirestoreMap())
+        batch.set(documentFor(uid, linked), linked.toFirestoreMap())
+        batch.commit().await()
+    }
+
+    /**
      * Stops sharing. The owner takes the 할 일 back — it returns to their own subtree, keeping its
      * id — while anyone else simply drops out of the member list, leaving it with its owner.
      */

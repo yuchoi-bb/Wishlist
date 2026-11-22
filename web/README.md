@@ -28,9 +28,12 @@ shows up on the other within about a second.
   under their 항목, so moving one here moves it everywhere.
 - Linking a 세부항목 to another 할 일 (**할 일 연결** in the editor). The row carries a ›; opening
   it narrows the table to that 할 일's own steps, and 뒤로 returns. The target stays an ordinary
-  항목 with its own place in the table — a link is a way in, not a second kind of thing.
+  항목 with its own place in the table — a link is a way in, not a second kind of thing. A linked
+  row shows **that 할 일's** 완료 rather than a flag of its own, and ticking it ticks the 할 일.
 - Sharing one 할 일 with another Google account (**공유** in the editor). The row carries a ⇄ and
   both sides see each other's ticks live. See 공유 below.
+- Sending **one 세부항목** to one person (the ↗ on its row in the editor), leaving the rest of the
+  할 일 private.
 
 Dates go in as epoch millis at local midnight, which `new Date(y, m, d)` gives directly — the
 browser is in the same zone as the phone, so nothing has to be converted the way ../mcp does it.
@@ -65,6 +68,27 @@ Two things follow. **The other person has to have opened Arc at least once** —
 not in the directory and the share says so rather than failing quietly. And a uid still works in
 the same box, for exactly that case: they read theirs from **내 UID 복사** (the header here, 설정 in
 the app) and send it over.
+
+### 세부항목 하나만 보내기
+
+A 세부항목 is an element of an array inside a document, so it cannot be shared on its own. What it
+can do is become a 할 일 — which is what `linkedItemId` has meant since links were added. The ↗ on
+a step does exactly that: the step is promoted into its own 할 일, born straight into
+`shared_items` with the recipient in it, and the step it came from is left pointing at it. Both
+writes go in one batch, so the parent is never left pointing at a 할 일 that was not created.
+
+What each side sees:
+
+- **The sender** keeps the 할 일 exactly as it was. The row now carries a ›, which opens the step's
+  own 할 일, and the rest of the 할 일 stays private — the recipient never sees the other steps,
+  the 메모, or that this 할 일 exists.
+- **The recipient** gets one 할 일 named after the step, under the same 대/중분류, with the parent's
+  name in its 메모 so it isn't a sentence with no context.
+- **완료 travels.** The sender's row shows the sent 할 일's own 완료, so it ticks itself when the
+  recipient finishes, and ticking it from either side is the same tick.
+
+To take it back, open the sent 할 일 (tap the › row) and 공유 중단. The link stays — the step is
+simply a 할 일 of its own now.
 
 **Publish the rules first.** `firestore.rules` at the repository root gained the `shared_items`
 and `email_index` blocks; until it is pasted into Firebase Console → Firestore Database → Rules,

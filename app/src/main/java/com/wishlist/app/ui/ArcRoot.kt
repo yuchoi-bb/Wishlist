@@ -181,6 +181,10 @@ fun ArcRoot(
                 viewModel.unshareItem(item)
                 showAddEdit = false
             },
+            onSendSubItem = { item, index, recipient ->
+                viewModel.sendSubItem(item, index, recipient)
+                showAddEdit = false
+            },
         )
     }
 }
